@@ -2,10 +2,12 @@ from data.db import get_connection
 from utils.calculations import calculate_profit_and_margin
 from services.logging_service import log_shipment_change
 
+
 def create_shipment(data, staff_id):
     conn = get_connection()
     cursor = conn.cursor()
 
+    # считаем прибыль компании
     profit, margin = calculate_profit_and_margin(
         data["broker_price"],
         data["driver_pay"]
@@ -25,13 +27,30 @@ def create_shipment(data, staff_id):
         data["broker_price"],
         data["driver_pay"],
         profit,
-        margin,
+        data["percentage_of_margin"],
         "created",
         "unpaid",
         "standard",
         data.get("comments")
     ))
 
+    shipment_id = cursor.lastrowid
     conn.commit()
+
+    # логируем создание
+    log_shipment_change(
+        shipment_id,
+        staff_id,
+        "shipment_created",
+        None,
+        f"Shipment created. Profit: {profit}"
+    )
+
     cursor.close()
     conn.close()
+
+    return {
+        "message": "Shipment created successfully",
+        "shipment_id": shipment_id,
+        "profit": profit
+    }
