@@ -149,16 +149,17 @@ This ensures:
 
 ---
 
-# 📂 Project Structure
+## 📂 Project Structure
 
-
+```
 FinancialTracking/
 │
-├── data/ # DB connection & security
-├── routers/ # API endpoints
-├── services/ # Business logic
-├── utils/ # Calculations
+├── data/        # DB connection & security
+├── routers/     # API endpoints
+├── services/    # Business logic
+├── utils/       # Calculations
 └── main.py
+```
     
 ---
 
