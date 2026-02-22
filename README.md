@@ -159,8 +159,7 @@ FinancialTracking/
 ├── services/ # Business logic
 ├── utils/ # Calculations
 └── main.py
-
-
+    
 ---
 
 # ▶️ Running the Project
