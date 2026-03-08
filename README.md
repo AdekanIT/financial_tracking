@@ -275,65 +275,65 @@ This workflow converts operational logistics activity into financial insights.
 ## 📊 Database Relationships
 
 
-staff
-│
-├── shipments (dispatcher_id)
-│
-├── salary_records (staff_id)
-│
-└── user_logs (staff_id)
-
-shipments
-│
-└── shipment_logs (shipment_id)
-
+staff  
+│  
+├── shipments (dispatcher_id)  
+│  
+├── salary_records (staff_id)  
+│  
+└── user_logs (staff_id)  
+  
+shipments  
+│  
+└── shipment_logs (shipment_id)  
+  
 
 ---
 
-## 📡 API Endpoints
+## 📡 API Endpoints  
 
-### Authentication
-
-
-POST /auth/login
+### Authentication  
 
 
-### User Management
+POST /auth/login  
 
 
-POST /users/create
-POST /users/change-password
-POST /users/change-role
-POST /users/change-status
-GET /users
-GET /users/logs
+### User Management  
 
 
-### Shipments
+POST /users/create  
+POST /users/change-password  
+POST /users/change-role  
+POST /users/change-status  
+GET /users  
+GET /users/logs  
 
 
-POST /shipments/create
+### Shipments  
 
 
-### Payroll
+POST /shipments/create  
 
 
-POST /salary/generate
-GET /salary/my
-GET /salary/all
-GET /salary/export
+### Payroll  
+
+  
+POST /salary/generate  
+GET /salary/my  
+GET /salary/all  
+GET /salary/export  
 
 
-### Analytics
+### Analytics  
 
 
-GET /analytics/dashboard
-GET /analytics/top-dispatchers
-GET /analytics/company-net-profit
-GET /analytics/payroll-vs-profit
-GET /analytics/profit-growth
-GET /analytics/leaderboard
-GET /analytics/kpi
+GET /analytics/dashboard  
+GET /analytics/top-dispatchers  
+GET /analytics/company-net-profit  
+GET /analytics/payroll-vs-profit  
+GET /analytics/profit-growth  
+GET /analytics/leaderboard  
+GET /analytics/kpi  
 
 
 ---
@@ -341,30 +341,30 @@ GET /analytics/kpi
 ## 📂 Project Structure
 
 
-FinancialTracking/
+FinancialTracking/  
 
-data/
-db.py
-security.py
-
-routers/
-auth.py
-users.py
-shipments.py
-salary.py
-analytics_router.py
-
-services/
-auth_service.py
-user_service.py
-salary_service.py
-salary_export_service.py
-analytics_service.py
-
-utils/
-calculations.py
-
-main.py
+data/  
+├── db.py  
+└── security.py  
+  
+routers/  
+├── auth.py  
+├── users.py  
+├── shipments.py  
+├── salary.py  
+└── analytics_router.py  
+  
+services/  
+├── auth_service.py  
+├── user_service.py  
+├── salary_service.py  
+├── salary_export_service.py  
+└── analytics_service.py  
+  
+utils/  
+└── calculations.py  
+  
+main.py  
 
 
 ---
