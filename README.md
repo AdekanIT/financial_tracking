@@ -1,4 +1,4 @@
-# 🚚 Financial Tracking and Management System (Backend)
+# 🚚 Financial Tracking and Management System
 
 ![FastAPI](https://img.shields.io/badge/FastAPI-backend-green)
 ![MySQL](https://img.shields.io/badge/Database-MySQL-blue)
@@ -6,9 +6,7 @@
 
 Backend of a logistics financial tracking system built with **FastAPI + MySQL**.
 
-This project is part of an **individual university project** focused on developing a real-world **financial management platform for logistics companies**.
-
-The system provides tools for managing shipments, calculating company profit, handling payroll, and generating financial analytics dashboards.
+The project is being extended with a web-based interface using **HTML, CSS, and JavaScript**, which will allow users to interact with the system through a browser dashboard.
 
 ---
 
@@ -23,7 +21,54 @@ The system provides tools for managing shipments, calculating company profit, ha
 | RBAC | Role-Based Access Control |
 | Bcrypt | Password hashing |
 | OpenPyXL | Excel report generation |
+| HTML | Website structure |
+| CSS | User interface styling |
+| JavaScript | Client-side logic |
+| Chart.js | Financial charts and dashboards |
 | Git & GitHub | Version control |
+
+---
+
+# 🌐 Frontend Architecture (In Development)
+
+A web-based user interface is currently being developed for the system.
+
+The frontend will be implemented using:
+
+- HTML templates
+- CSS styling
+- JavaScript client-side logic
+- Chart.js for financial dashboards
+
+The web interface will communicate with the FastAPI backend through REST API endpoints.
+
+At the current stage, the **frontend project structure has been designed**, and implementation of the pages is in progress.
+
+# 🌐 Web Interface
+
+The system includes a web-based dashboard that allows users to interact with the platform through a browser.
+
+The website is built using:
+
+- HTML templates
+- CSS styling
+- JavaScript for client-side logic
+- Chart.js for financial charts
+
+The web interface communicates with the FastAPI backend using REST API endpoints.
+
+## Planned Website Pages
+
+The web interface will include the following pages:
+
+| Page | Purpose |
+|-----|------|
+| Login | Staff authentication |
+| Dashboard | Company financial overview |
+| Shipments | Shipment management |
+| Salary | Employee salary management |
+| Users | Staff administration |
+| Archive | Historical shipment records |
 
 ---
 
@@ -44,6 +89,10 @@ The backend follows a **layered architecture**, separating:
 - API endpoints
 - business logic
 - database access
+
+---
+
+
 
 ---
 
@@ -240,21 +289,27 @@ Sheet 2 – Company Summary
 
 ## ⚙️ System Workflow
 
+User opens web dashboard  
+↓  
+User logs into the system  
+↓  
+Dashboard loads financial data via API  
+↓  
+Dispatcher creates shipment  
+↓  
+Shipment stored in database  
+↓  
+Profit calculated automatically  
+↓  
+Salary engine calculates commissions  
+↓  
+Salary record generated  
+↓  
+Analytics data displayed on dashboard  
+↓  
+Managers export financial reports  
 
-Dispatcher creates shipment
-↓
-Shipment stored in database
-↓
-Profit calculated automatically
-↓
-Payroll engine calculates commissions
-↓
-Salary record generated
-↓
-Analytics dashboards update
-↓
-Managers export financial reports
-
+---
 
 This workflow converts operational logistics activity into financial insights.
 
@@ -340,32 +395,60 @@ GET /analytics/kpi
 
 ## 📂 Project Structure
 
-
-FinancialTracking/  
+FinancialTracking/
 
 data/  
 ├── db.py  
 └── security.py  
-  
+
 routers/  
 ├── auth.py  
 ├── users.py  
 ├── shipments.py  
 ├── salary.py  
-└── analytics_router.py  
-  
+├── analytics_router.py  
+
 services/  
 ├── auth_service.py  
 ├── user_service.py  
+├── shipment_service.py  
 ├── salary_service.py  
 ├── salary_export_service.py  
 └── analytics_service.py  
-  
+
 utils/  
 └── calculations.py  
-  
-main.py  
 
+templates/ *(planned frontend pages)*  
+├── auth/  
+├── dashboard/  
+├── shipments/  
+├── salary/  
+├── users/  
+└── archive/  
+
+static/ *(frontend assets)*  
+├── css/  
+└── js/  
+
+main.py
+
+
+---
+
+## 🌍 Frontend – Backend Interaction
+
+The website interacts with the backend using REST API requests.
+
+Browser (HTML + JS)  
+↓  
+FastAPI Routers  
+↓  
+Service Layer  
+↓  
+MySQL Database  
+
+JavaScript fetch requests retrieve data from API endpoints and dynamically update the dashboard interface.
 
 ---
 
@@ -404,12 +487,20 @@ http://127.0.0.1:8000/docs
 - Excel Reporting
 - Audit Logging
 
+
+### Frontend Development
+
+- Web interface architecture designed
+- Frontend folder structure prepared
+- HTML dashboard pages planned
+- Frontend implementation in progress
+
 ---
 
 ## 🎯 System Architecture
 
 
-Client
+Browser (HTML + JS)
 ↓
 FastAPI Routers (API Layer)
 ↓
