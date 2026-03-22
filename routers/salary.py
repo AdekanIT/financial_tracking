@@ -9,7 +9,10 @@ from services.salary_export_service import generate_salary_excel
 router = APIRouter(prefix="/salary", tags=["Salary"])
 
 
-# (anyone)
+# =============================
+# MY SALARY (ANY USER)
+# =============================
+
 @router.get("/my")
 def my_salary(current_user: dict = Depends(get_current_user)):
     conn = get_connection()
@@ -31,7 +34,10 @@ def my_salary(current_user: dict = Depends(get_current_user)):
     return salaries
 
 
-# (manager + accounting)
+# =============================
+# ALL SALARIES (FINANCE ROLES)
+# =============================
+
 @router.get("/all")
 def all_salaries(current_user: dict = Depends(require_roles(FINANCE_ROLES))):
     conn = get_connection()
@@ -42,7 +48,7 @@ def all_salaries(current_user: dict = Depends(require_roles(FINANCE_ROLES))):
         FROM salary_records sr
         JOIN staff s ON s.staff_id = sr.staff_id
         WHERE sr.is_active = TRUE
-        ORDER BY period_start DESC
+        ORDER BY sr.period_start DESC
     """)
 
     salaries = cursor.fetchall()
@@ -53,24 +59,28 @@ def all_salaries(current_user: dict = Depends(require_roles(FINANCE_ROLES))):
     return salaries
 
 
-# generate salary
+# =============================
+# GENERATE SALARY (MANAGER ONLY)
+# =============================
+
 @router.post("/generate")
 def generate_salary(
     staff_id: int,
     start_date: date,
     end_date: date,
     custom_bonus: float = 0.0,
-    current_user: dict = Depends(require_roles(FINANCE_ROLES))
+    current_user: dict = Depends(require_roles(["manager"]))  # 🔥 только manager
 ):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # защита от повторной генерации
+    # защита от дубликатов
     cursor.execute("""
         SELECT id FROM salary_records
         WHERE staff_id = %s
         AND period_start = %s
         AND period_end = %s
+        AND is_active = TRUE
     """, (staff_id, start_date, end_date))
 
     existing = cursor.fetchone()
@@ -84,24 +94,24 @@ def generate_salary(
             detail="Salary already generated for this period"
         )
 
-    result = generate_salary_for_period(
+    return generate_salary_for_period(
         staff_id,
         start_date,
         end_date,
         custom_bonus
     )
 
-    return result
 
+# =============================
+# EXPORT SALARY (FINANCE ROLES)
+# =============================
 
-# Excel export
 @router.get("/export")
 def export_salary(
     start_date: date,
     end_date: date,
     current_user: dict = Depends(require_roles(FINANCE_ROLES))
 ):
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -126,17 +136,17 @@ def export_salary(
     cursor.close()
     conn.close()
 
-    salary_data = []
-
-    for row in rows:
-        salary_data.append({
+    salary_data = [
+        {
             "employee": row["staff_full_name"],
             "role": row["job_title"],
             "base_salary": row["base_salary"],
             "shipment_bonus": row["shipment_bonus"],
             "custom_bonus": row["custom_bonus"],
             "total_salary": row["total_salary"]
-        })
+        }
+        for row in rows
+    ]
 
     excel_file = generate_salary_excel(salary_data)
 

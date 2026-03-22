@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div style="max-width:300px;margin:100px auto;">
+    <h2>Login</h2>
+
+    <input id="username" placeholder="Username"><br><br>
+    <input id="password" type="password" placeholder="Password"><br><br>
+
+    <button onclick="login()">Login</button>
+</div>
+
+<script>
+async function login() {
+    const res = await fetch("http://127.0.0.1:8000/auth/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            username: username.value,
+            password: password.value
+        })
+    });
+
+    const data = await res.json();
+
+    if (data.access_token) {
+        localStorage.setItem("token", data.access_token);
+        window.location.href = "/dashboard";
+    } else {
+        alert("Login failed");
+    }
+}
+</script>
+
+</body>
+</html>

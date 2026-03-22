@@ -1,82 +1,108 @@
 from fastapi import APIRouter, Depends
-from data.db import require_roles, get_current_user
+from data.db import require_roles
 from services.user_service import (
     create_user,
     change_password,
-    change_role,
     change_user_status,
-    get_users,
+    get_all_users,
     get_user_logs
 )
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
+# =====================================================
+# CREATE USER
+# =====================================================
 @router.post("/create")
 def create_user_endpoint(
-    name: str,
+    staff_username: str,
+    full_name: str,
     job_title: str,
-    role: str,
     password: str,
-    current_user: dict = Depends(require_roles(["Manager"]))
+    current_user: dict = Depends(require_roles(["manager", "hr"]))
 ):
+    """
+    Создаёт нового пользователя.
+    Доступ только: Manager, HR.
+    """
+
     return create_user(
-        name,
-        job_title,
-        role,
-        password,
-        current_user["staff_id"]
+        staff_username=staff_username,
+        staff_full_name=full_name,
+        job_title=job_title,
+        password=password,
+        created_by=current_user["staff_id"]
     )
 
 
+# =====================================================
+# CHANGE PASSWORD
+# =====================================================
 @router.post("/change-password")
 def change_password_endpoint(
     staff_id: int,
     new_password: str,
-    current_user: dict = Depends(require_roles(["Manager", "HR"]))
+    current_user: dict = Depends(require_roles(["manager", "hr"]))
 ):
+    """
+    Сменить пароль любого пользователя.
+    Доступ: Manager, HR.
+    """
+
     return change_password(
-        staff_id,
-        new_password,
-        current_user["staff_id"]
+        staff_id=staff_id,
+        new_password=new_password,
+        changed_by=current_user["staff_id"]
     )
 
 
-@router.post("/change-role")
-def change_role_endpoint(
-    staff_id: int,
-    new_role: str,
-    current_user: dict = Depends(require_roles(["Manager"]))
-):
-    return change_role(
-        staff_id,
-        new_role,
-        current_user["staff_id"]
-    )
-
-
+# =====================================================
+# ENABLE / DISABLE (USER STATUS)
+# =====================================================
 @router.post("/change-status")
 def change_status_endpoint(
     staff_id: int,
     is_active: bool,
-    current_user: dict = Depends(require_roles(["Manager"]))
+    current_user: dict = Depends(require_roles(["manager"]))
 ):
+    """
+    Активировать / деактивировать пользователя.
+    Доступ: только Manager.
+    """
+
     return change_user_status(
-        staff_id,
-        is_active,
-        current_user["staff_id"]
+        staff_id=staff_id,
+        is_active=is_active,
+        changed_by=current_user["staff_id"]
     )
 
 
+# =====================================================
+# GET ALL USERS
+# =====================================================
 @router.get("/")
 def list_users(
-    current_user: dict = Depends(require_roles(["Manager", "Accounting"]))
+    current_user: dict = Depends(require_roles(["manager", "accounting"]))
 ):
-    return get_users()
+    """
+    Получить список всех пользователей.
+    Доступ: Manager, Accounting.
+    """
+
+    return get_all_users()
 
 
+# =====================================================
+# USER LOGS
+# =====================================================
 @router.get("/logs")
 def list_user_logs(
-    current_user: dict = Depends(require_roles(["Manager"]))
+    current_user: dict = Depends(require_roles(["manager"]))
 ):
+    """
+    Журнал действий пользователей.
+    Доступ: только Manager.
+    """
+
     return get_user_logs()

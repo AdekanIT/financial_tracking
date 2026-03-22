@@ -1,18 +1,22 @@
 import mysql.connector
 from passlib.context import CryptContext
-from jose import jwt
-from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
+from datetime import datetime, timedelta, timezone
 
 
+# ======================================================
+# JWT CONFIG
+# ======================================================
+SECRET_KEY = "SUPER_SECRET_KEY_CHANGE_ME"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_HOURS = 24
 
 
-
-# ==============================
-# MySQL CONNECTION
-# ==============================
+# ======================================================
+# MYSQL CONNECTION
+# ======================================================
 def get_connection():
     return mysql.connector.connect(
         host="localhost",
@@ -21,8 +25,39 @@ def get_connection():
         database="financial_tracking"
     )
 
+
 # ======================================================
-# JWT SECURITY
+# PASSWORD HASHING
+# ======================================================
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str):
+    password = password[:72]  # bcrypt limitation
+    return pwd_context.hash(password)
+
+def verify_password(password: str, hashed: str):
+    password = password[:72]
+    return pwd_context.verify(password, hashed)
+
+
+# ======================================================
+# JWT TOKEN CREATION
+# ======================================================
+def create_access_token(data: dict):
+    to_encode = data.copy()
+
+    expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.now(timezone.utc)
+    })
+
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+# ======================================================
+# SECURITY - TOKEN DECODING
 # ======================================================
 security = HTTPBearer()
 
@@ -47,56 +82,19 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=401, detail="Token expired or invalid")
 
 
-
-# ==============================
-# PASSWORD HASHING
-# ==============================
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def hash_password(password: str):
-    password = password[:72]  # range of bcrypt
-    return pwd_context.hash(password)
-
-def verify_password(password: str, hashed: str):
-    password = password[:72]
-    return pwd_context.verify(password, hashed)
-
-# ==============================
-# JWT TOKEN
-# ==============================
-SECRET_KEY = "SUPER_SECRET_KEY_CHANGE_ME"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_HOURS = 24  # ← token live 24 hours
-
-def create_access_token(data: dict):
-    to_encode = data.copy()
-
-    expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
-
-    to_encode.update({
-        "exp": expire,
-        "iat": datetime.now(timezone.utc)  # created date
-    })
-
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
 # ======================================================
-# ROLES MODEL
+# ROLE GROUPS
 # ======================================================
-
 ADMIN_ROLES = ["manager"]
 FINANCE_ROLES = ["manager", "accounting"]
 SUPERVISOR_ROLES = ["manager", "supervisor"]
 STAFF_CREATOR_ROLES = ["manager", "supervisor", "hr"]
-ALL_AUTHORIZED = ["manager","accounting","supervisor","hr","dispatcher","tracking"]
+ALL_AUTHORIZED = ["manager", "accounting", "supervisor", "hr", "dispatcher", "tracking"]
 
 
 # ======================================================
-# ROLE CHECK DEPENDENCIES
+# ROLE CHECK MIDDLEWARE
 # ======================================================
-
 def require_roles(allowed_roles: list):
     def role_checker(current_user: dict = Depends(get_current_user)):
         if current_user["role"] not in allowed_roles:

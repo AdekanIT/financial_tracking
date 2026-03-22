@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="layout">
+    <aside class="sidebar">
+        <a href="/dashboard">Dashboard</a>
+        <a href="/shipments">Shipments</a>
+        <a href="/salary">Salary</a>
+        <a href="/users">Users</a>
+        <a href="/archive">Archive</a>
+    </aside>
+
+    <main class="content">
+        <div class="cards">
+            <div class="card"><p id="totalProfit"></p></div>
+            <div class="card"><p id="totalShipments"></p></div>
+        </div>
+
+        <canvas id="chart"></canvas>
+    </main>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>

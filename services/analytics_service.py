@@ -15,8 +15,9 @@ def dispatcher_dashboard(staff_id):
         DATE_FORMAT(delivery_date,'%Y-%m') as month,
         SUM(profit) as profit
         FROM shipments
-        WHERE dispatcher_id = %s
+        WHERE assigned_staff_id = %s
         AND shipment_status = 'delivered'
+        AND is_deleted = FALSE
         GROUP BY month
         ORDER BY month
     """, (staff_id,))
@@ -48,6 +49,7 @@ def company_dashboard():
         SUM(profit) as profit
         FROM shipments
         WHERE shipment_status='delivered'
+        AND is_deleted = FALSE
         GROUP BY month
         ORDER BY month
     """)
@@ -60,8 +62,9 @@ def company_dashboard():
         s.staff_full_name,
         SUM(sh.profit) as profit
         FROM shipments sh
-        JOIN staff s ON s.staff_id = sh.dispatcher_id
+        JOIN staff s ON s.staff_id = sh.assigned_staff_id
         WHERE sh.shipment_status='delivered'
+        AND sh.is_deleted = FALSE
         GROUP BY s.staff_full_name
         ORDER BY profit DESC
     """)
@@ -93,8 +96,9 @@ def supervisor_dashboard():
         COUNT(sh.id) as shipments,
         SUM(sh.profit) as profit
         FROM shipments sh
-        JOIN staff s ON s.staff_id = sh.dispatcher_id
+        JOIN staff s ON s.staff_id = sh.assigned_staff_id
         WHERE sh.shipment_status='delivered'
+        AND sh.is_deleted = FALSE
         GROUP BY s.staff_full_name
         ORDER BY profit DESC
     """)
@@ -124,8 +128,9 @@ def top_dispatchers():
         s.staff_full_name,
         SUM(sh.profit) as profit
         FROM shipments sh
-        JOIN staff s ON s.staff_id = sh.dispatcher_id
+        JOIN staff s ON s.staff_id = sh.assigned_staff_id
         WHERE sh.shipment_status='delivered'
+        AND sh.is_deleted = FALSE
         GROUP BY s.staff_full_name
         ORDER BY profit DESC
         LIMIT 5
@@ -155,6 +160,7 @@ def company_net_profit():
         SELECT SUM(profit) as total_profit
         FROM shipments
         WHERE shipment_status='delivered'
+        AND is_deleted = FALSE
     """)
 
     shipment_profit = cursor.fetchone()["total_profit"] or 0
@@ -195,6 +201,7 @@ def payroll_vs_profit():
         SUM(profit) as profit
         FROM shipments
         WHERE shipment_status='delivered'
+        AND is_deleted = FALSE
         GROUP BY month
         ORDER BY month
     """)
@@ -237,6 +244,7 @@ def profit_growth_indicator():
         SUM(profit) as profit
         FROM shipments
         WHERE shipment_status='delivered'
+        AND is_deleted = FALSE
         GROUP BY month
         ORDER BY month DESC
         LIMIT 2
@@ -250,8 +258,8 @@ def profit_growth_indicator():
     if len(rows) < 2:
         return {"message": "Not enough data"}
 
-    current_month = rows[0]["profit"]
-    last_month = rows[1]["profit"]
+    current_month = rows[0]["profit"] or 0
+    last_month = rows[1]["profit"] or 0
 
     change = current_month - last_month
 
@@ -281,8 +289,9 @@ def top_employees_leaderboard():
         s.staff_full_name,
         SUM(sh.profit) as profit
         FROM shipments sh
-        JOIN staff s ON s.staff_id = sh.dispatcher_id
+        JOIN staff s ON s.staff_id = sh.assigned_staff_id
         WHERE sh.shipment_status='delivered'
+        AND sh.is_deleted = FALSE
         GROUP BY s.staff_full_name
         ORDER BY profit DESC
         LIMIT 5
@@ -301,7 +310,7 @@ def top_employees_leaderboard():
         leaderboard.append({
             "rank": rank,
             "name": emp["staff_full_name"],
-            "profit": emp["profit"]
+            "profit": emp["profit"] or 0
         })
         rank += 1
 
@@ -321,6 +330,7 @@ def company_kpi_dashboard():
         SELECT COUNT(*) as shipments
         FROM shipments
         WHERE shipment_status='delivered'
+        AND is_deleted = FALSE
     """)
 
     shipments = cursor.fetchone()["shipments"]
@@ -329,6 +339,7 @@ def company_kpi_dashboard():
         SELECT SUM(profit) as profit
         FROM shipments
         WHERE shipment_status='delivered'
+        AND is_deleted = FALSE
     """)
 
     profit = cursor.fetchone()["profit"] or 0
@@ -362,13 +373,13 @@ def build_dashboard(user):
 
     role = user["role"]
 
-    if role == "Dispatcher":
+    if role == "dispatcher":
         return dispatcher_dashboard(user["staff_id"])
 
-    if role in ["Manager", "Accounting"]:
+    if role in ["manager", "accounting"]:
         return company_dashboard()
 
-    if role == "Supervisor":
+    if role == "supervisor":
         return supervisor_dashboard()
 
     return {"message": "No analytics available"}
