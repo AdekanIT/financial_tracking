@@ -1,25 +1,24 @@
 import bcrypt
 import jwt
 from datetime import datetime, timedelta
-from config import SECRET_KEY, ALGORITHM
-from database import get_connection
+from data.db import SECRET_KEY, ALGORITHM, get_connection
 
 # -------------------------------------------------------
 # Нормализация job_title
 # -------------------------------------------------------
 def format_job_title(job_title: str):
-    job_title = job_title.strip()
-    job_title_lower = job_title.lower()
+    job_title = job_title.strip().lower()
 
     mapping = {
         "manager": "Manager",
         "accounting": "Accounting",
-        "hr": "HR",
-        "driver": "Driver",
-        "dispatcher": "Dispatcher"
+        "supervisor": "Supervisor",
+        "dispatcher": "Dispatcher",
+        "tracking": "Tracking",
+        "hr": "HR"
     }
 
-    return mapping.get(job_title_lower, job_title.capitalize())
+    return mapping.get(job_title, job_title.capitalize())
 
 # -------------------------------------------------------
 # Определение роли по job_title
@@ -31,12 +30,14 @@ def get_role_from_job(job_title: str):
         return "manager"
     if jt == "accounting":
         return "accounting"
-    if jt == "hr":
-        return "hr"
+    if jt == "supervisor":
+        return "supervisor"
     if jt == "dispatcher":
         return "dispatcher"
-    if jt == "driver":
-        return "driver"
+    if jt == "tracking":
+        return "tracking"
+    if jt == "hr":
+        return "hr"
 
     return "user"
 
@@ -47,39 +48,40 @@ def create_user(staff_username, staff_full_name, job_title, password, created_by
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    job_title_clean = format_job_title(job_title)
+    try:
+        job_title_clean = format_job_title(job_title)
+        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-    # bcrypt — основной рабочий хэш
-    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        cursor.execute("""
+            INSERT INTO staff
+            (staff_username, staff_full_name, job_title, password, password_hash, is_active)
+            VALUES (%s, %s, %s, %s, %s, TRUE)
+        """, (
+            staff_username.strip(),
+            staff_full_name.strip(),
+            job_title_clean,
+            password,
+            password_hash
+        ))
 
-    cursor.execute("""
-        INSERT INTO staff
-        (staff_username, staff_full_name, job_title, password, password_hash, is_active)
-        VALUES (%s, %s, %s, %s, %s, TRUE)
-    """, (
-        staff_username.strip(),
-        staff_full_name.strip(),
-        job_title_clean,
-        password,
-        password_hash
-    ))
+        staff_id = cursor.lastrowid
 
-    staff_id = cursor.lastrowid
+        cursor.execute("""
+            INSERT INTO user_logs
+            (staff_id, action_type, changed_by)
+            VALUES (%s, 'user_created', %s)
+        """, (staff_id, created_by))
 
-    cursor.execute("""
-        INSERT INTO user_logs
-        (staff_id, action_type, changed_by)
-        VALUES (%s, 'user_created', %s)
-    """, (staff_id, created_by))
+        conn.commit()
 
-    conn.commit()
-    cursor.close()
-    conn.close()
+        return {"message": "User created", "staff_id": staff_id}
 
-    return {
-        "message": "User created",
-        "staff_id": staff_id
-    }
+    except Exception as e:
+        return {"error": str(e)}
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # -------------------------------------------------------
 # Авторизация пользователя
@@ -104,8 +106,7 @@ def login_user(username, password):
     if not user["is_active"]:
         return {"error": "User inactive"}
 
-    # Основная проверка пароля по bcrypt
-    if not bcrypt.verify(password, user["password_hash"]):
+    if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
         return None
 
     role = get_role_from_job(user["job_title"])
@@ -127,7 +128,7 @@ def login_user(username, password):
     }
 
 # -------------------------------------------------------
-# Получение списка всех пользователей
+# Получение всех пользователей
 # -------------------------------------------------------
 def get_all_users():
     conn = get_connection()
@@ -137,39 +138,11 @@ def get_all_users():
         SELECT staff_id, staff_username, staff_full_name, job_title, is_active
         FROM staff
     """)
-
     users = cursor.fetchall()
 
     cursor.close()
     conn.close()
     return users
-
-# -------------------------------------------------------
-# Обновление job_title
-# -------------------------------------------------------
-def update_job_title(staff_id, new_job_title, changed_by):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-
-    new_job_title_clean = format_job_title(new_job_title)
-
-    cursor.execute("""
-        UPDATE staff
-        SET job_title=%s
-        WHERE staff_id=%s
-    """, (new_job_title_clean, staff_id))
-
-    cursor.execute("""
-        INSERT INTO user_logs
-        (staff_id, action_type, changed_by)
-        VALUES (%s,'title_changed',%s)
-    """, (staff_id, changed_by))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    return {"message": "Job title updated"}
 
 # -------------------------------------------------------
 # Смена пароля
@@ -195,55 +168,46 @@ def change_password(staff_id, new_password, changed_by):
     conn.commit()
     cursor.close()
     conn.close()
-
     return {"message": "Password updated"}
 
 # -------------------------------------------------------
-# Деактивация аккаунта
+# Изменение статуса пользователя
 # -------------------------------------------------------
-def deactivate_user(staff_id, changed_by):
+def change_user_status(staff_id, is_active, changed_by):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute("""
         UPDATE staff
-        SET is_active=FALSE
+        SET is_active=%s
         WHERE staff_id=%s
-    """, (staff_id,))
+    """, (is_active, staff_id))
+
+    action = "activated" if is_active else "deactivated"
 
     cursor.execute("""
-        INSERT INTO user_logs
-        (staff_id, action_type, changed_by)
-        VALUES (%s,'deactivated',%s)
-    """, (staff_id, changed_by))
+        INSERT INTO user_logs (staff_id, action_type, changed_by)
+        VALUES (%s, %s, %s)
+    """, (staff_id, action, changed_by))
 
     conn.commit()
     cursor.close()
     conn.close()
 
-    return {"message": "User deactivated"}
+    return {"message": f"User {action}"}
 
 # -------------------------------------------------------
-# Активация пользователя
+# Логи пользователей
 # -------------------------------------------------------
-def activate_user(staff_id, changed_by):
+def get_user_logs():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute("""
-        UPDATE staff
-        SET is_active=TRUE
-        WHERE staff_id=%s
-    """, (staff_id,))
+        SELECT * FROM user_logs ORDER BY created_at DESC
+    """)
 
-    cursor.execute("""
-        INSERT INTO user_logs
-        (staff_id, action_type, changed_by)
-        VALUES (%s,'activated',%s)
-    """, (staff_id, changed_by))
-
-    conn.commit()
+    logs = cursor.fetchall()
     cursor.close()
     conn.close()
-
-    return {"message": "User activated"}
+    return logs

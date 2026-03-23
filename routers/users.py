@@ -10,7 +10,6 @@ from services.user_service import (
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-
 # =====================================================
 # CREATE USER
 # =====================================================
@@ -22,11 +21,6 @@ def create_user_endpoint(
     password: str,
     current_user: dict = Depends(require_roles(["manager", "hr"]))
 ):
-    """
-    Создаёт нового пользователя.
-    Доступ только: Manager, HR.
-    """
-
     return create_user(
         staff_username=staff_username,
         staff_full_name=full_name,
@@ -34,7 +28,6 @@ def create_user_endpoint(
         password=password,
         created_by=current_user["staff_id"]
     )
-
 
 # =====================================================
 # CHANGE PASSWORD
@@ -45,20 +38,14 @@ def change_password_endpoint(
     new_password: str,
     current_user: dict = Depends(require_roles(["manager", "hr"]))
 ):
-    """
-    Сменить пароль любого пользователя.
-    Доступ: Manager, HR.
-    """
-
     return change_password(
         staff_id=staff_id,
         new_password=new_password,
         changed_by=current_user["staff_id"]
     )
 
-
 # =====================================================
-# ENABLE / DISABLE (USER STATUS)
+# CHANGE STATUS
 # =====================================================
 @router.post("/change-status")
 def change_status_endpoint(
@@ -66,17 +53,11 @@ def change_status_endpoint(
     is_active: bool,
     current_user: dict = Depends(require_roles(["manager"]))
 ):
-    """
-    Активировать / деактивировать пользователя.
-    Доступ: только Manager.
-    """
-
     return change_user_status(
         staff_id=staff_id,
         is_active=is_active,
         changed_by=current_user["staff_id"]
     )
-
 
 # =====================================================
 # GET ALL USERS
@@ -85,13 +66,7 @@ def change_status_endpoint(
 def list_users(
     current_user: dict = Depends(require_roles(["manager", "accounting"]))
 ):
-    """
-    Получить список всех пользователей.
-    Доступ: Manager, Accounting.
-    """
-
     return get_all_users()
-
 
 # =====================================================
 # USER LOGS
@@ -100,9 +75,4 @@ def list_users(
 def list_user_logs(
     current_user: dict = Depends(require_roles(["manager"]))
 ):
-    """
-    Журнал действий пользователей.
-    Доступ: только Manager.
-    """
-
     return get_user_logs()

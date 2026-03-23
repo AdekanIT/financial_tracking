@@ -29,33 +29,37 @@ The project is being extended with a web-based interface using **HTML, CSS, and 
 
 ---
 
+<!-- START FRONTEND ARCHITECTURE -->
 # 🌐 Frontend Architecture (In Development)
 
-A web-based user interface is currently being developed for the system.
-
-The frontend will be implemented using:
+The frontend is currently being developed with:
 
 - HTML templates
 - CSS styling
 - JavaScript client-side logic
 - Chart.js for financial dashboards
 
-The web interface will communicate with the FastAPI backend through REST API endpoints.
+The web interface communicates with the FastAPI backend via REST API endpoints.  
 
-At the current stage, the **frontend project structure has been designed**, and implementation of the pages is in progress.
+Current progress:
 
-# 🌐 Web Interface
+- Frontend folder structure prepared  
+- Pages for Login, Dashboard, Shipments, Salary, Users, and Archive planned  
+- Implementation in progress
+<!-- END FRONTEND ARCHITECTURE -->
 
-The system includes a web-based dashboard that allows users to interact with the platform through a browser.
+<!-- START WEB INTERFACE PAGES -->
+# 🌐 Web Interface Pages
 
-The website is built using:
-
-- HTML templates
-- CSS styling
-- JavaScript for client-side logic
-- Chart.js for financial charts
-
-The web interface communicates with the FastAPI backend using REST API endpoints.
+| Page | Purpose |
+|-----|------|
+| Login | Staff authentication |
+| Dashboard | Company financial overview |
+| Shipments | Shipment management |
+| Salary | Employee salary management |
+| Users | Staff administration |
+| Archive | Historical shipment records |
+<!-- END WEB INTERFACE PAGES -->
 
 ## Planned Website Pages
 
@@ -115,9 +119,14 @@ python-jose
 
 ---
 
+<!-- START USER MANAGEMENT -->
 # 👥 User Management System
 
-The system includes a **complete user administration module**.
+Users are **never deleted**, instead:
+
+```python
+is_active = False
+```
 
 ### Features
 
@@ -141,9 +150,7 @@ This preserves historical data.
 
 ## 📜 User Audit Logs
 
-All user changes are recorded in the **user_logs** table.
-
-Tracked events include:
+Tracked events:
 
 - `user_created`
 - `password_changed`
@@ -152,34 +159,32 @@ Tracked events include:
 
 ### Example Log
 
-| ID | Staff | Action | Changed By | Date |
-|----|------|--------|-----------|------|
-| 1 | Alex | user_created | Manager | 2026 |
+| ID  | Staff | Action       | Changed By | Date |
+|-----|-------|-------------|------------|------|
+| 1   | Alex  | user_created | Manager    | 2026 |
 
 This provides a complete **audit trail for system activity**.
 
 ---
 
+<!-- START RBAC -->
 ## 👥 Role-Based Access Control (RBAC)
-
-The system enforces role-based permissions.
 
 | Role | Access |
 |------|-------|
-| Owner | Company financial overview |
+| Owner | Full company financial overview |
 | Manager | Full system access |
 | Accounting | Payroll & financial data |
 | Supervisor | Shipment monitoring |
 | HR | Staff management |
-| Dispatcher / Tracking | Personal data only |
+| Dispatcher / Tracking | Personal shipment data |
 
-Access control is implemented using **FastAPI dependency validation**.
-
+RBAC is enforced using **FastAPI dependency validation**.
+<!-- END RBAC -->
 ---
 
+<!-- START SHIPMENTS MODULE -->
 ## 🚚 Shipments Financial Module
-
-Shipments represent the **core operational and financial entity**.
 
 Each shipment contains:
 
@@ -188,6 +193,15 @@ Each shipment contains:
 - company profit
 - margin percentage
 - commission percentage
+
+### Profit Formula
+
+```text
+profit = broker_price - driver_pay
+```
+Only shipments with status delivered are used for payroll and analytics.
+
+<!-- END SHIPMENTS MODULE -->
 
 ### Profit Formula
 profit = broker_price - driver_pay
@@ -203,9 +217,35 @@ are used for payroll calculations and analytics.
 
 ---
 
+<!-- START PAYROLL MODULE -->
 ## 💰 Payroll & Salary Engine
 
-The payroll system calculates employee salaries based on completed shipments.
+### Salary Formula
+
+Monthly Salary = Base Salary + Shipment Commissions + Custom Bonuses
+
+
+### Commission Formula
+
+commission = shipment_profit × commission_percentage / 100
+
+
+### Features
+- Salary generation by date period
+- Commission calculation from delivered shipments
+- Custom bonus support
+- Salary history tracking
+- Duplicate salary protection
+- RBAC-secured payroll endpoints
+
+### Versioned Salary Records (Audit Trail)
+
+| ID  | Staff | Total | Active |
+|-----|-------|-------|--------|
+| 10  | John  | 60    | ❌ Old |
+| 11  | John  | 80    | ✅ Current |
+
+<!-- END PAYROLL MODULE -->
 
 ### Salary Formula
 
@@ -400,14 +440,14 @@ FinancialTracking/
 data/  
 ├── db.py  
 └── security.py  
-
+  
 routers/  
 ├── auth.py  
 ├── users.py  
 ├── shipments.py  
 ├── salary.py  
 ├── analytics_router.py  
-
+  
 services/  
 ├── auth_service.py  
 ├── user_service.py  
@@ -419,20 +459,26 @@ services/
 utils/  
 └── calculations.py  
 
-templates/ *(planned frontend pages)*  
-├── auth/  
-├── dashboard/  
-├── shipments/  
-├── salary/  
-├── users/  
-└── archive/  
+templates/  
+├── archive/archive.html  
+├── auth/auth.html  
+├── dashboard/dashboard.html  
+├── salary/salary.html  
+├── shipment/shipment.html  
+└── users/users.html  
 
-static/ *(frontend assets)*  
-├── css/  
+static/  
+├── css/style.css  
 └── js/  
-
-main.py
-
+├── api.js  
+├── archive.js  
+├── auth.js  
+├── dashboard.js  
+├── salary.js  
+├── shipment.js  
+└── user.js    
+  
+main.py  
 
 ---
 
