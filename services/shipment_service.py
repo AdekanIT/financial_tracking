@@ -1,7 +1,68 @@
 from datetime import datetime
+from fastapi import HTTPException, status
+
 from data.db import get_connection
 from utils.calculations import calculate_profit_and_margin
 from services.logging_service import log_shipment_change
+
+
+# =======================================================
+# VALIDATION HELPERS
+# =======================================================
+def validate_company(company_id: int):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT company_id, company_name, company_code
+            FROM companies
+            WHERE company_id = %s
+        """, (company_id,))
+        company = cursor.fetchone()
+
+        if not company:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company not found"
+            )
+
+        return company
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def validate_staff(staff_id: int):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT staff_id, staff_full_name, job_title, is_active
+            FROM staff
+            WHERE staff_id = %s
+        """, (staff_id,))
+        staff = cursor.fetchone()
+
+        if not staff:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assigned staff not found"
+            )
+
+        if int(staff["is_active"]) != 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Assigned staff is inactive"
+            )
+
+        return staff
+
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =======================================================
@@ -15,17 +76,7 @@ def generate_reference_number(company_id: int) -> str:
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # get company code
-        cursor.execute("""
-            SELECT company_code
-            FROM companies
-            WHERE company_id = %s
-        """, (company_id,))
-        company = cursor.fetchone()
-
-        if not company:
-            raise Exception("Company not found")
-
+        company = validate_company(company_id)
         company_code = company["company_code"].strip().upper()
 
         now = datetime.now()
@@ -33,7 +84,6 @@ def generate_reference_number(company_id: int) -> str:
         year_str = now.strftime("%Y")
         prefix = f"{company_code}{month_str}{year_str}"
 
-        # find last reference number for this company and this month/year
         cursor.execute("""
             SELECT reference_number
             FROM shipments
@@ -52,9 +102,7 @@ def generate_reference_number(company_id: int) -> str:
         else:
             new_counter = 1
 
-        counter_str = str(new_counter).zfill(4)
-
-        return f"{prefix}{counter_str}"
+        return f"{prefix}{str(new_counter).zfill(4)}"
 
     finally:
         cursor.close()
@@ -69,17 +117,28 @@ def create_shipment(data, staff_id):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        broker_price = float(data.get("broker_price", 0) or 0)
-        driver_pay = float(data.get("driver_pay", 0) or 0)
+        company_id = data.get("company_id")
+        if not company_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="company_id is required"
+            )
 
-        profit, margin = calculate_profit_and_margin(broker_price, driver_pay)
-
-        reference_number = generate_reference_number(data["company_id"])
+        validate_company(company_id)
 
         assigned_staff_id = data.get("assigned_staff_id", staff_id)
+        validate_staff(assigned_staff_id)
+
+        broker_price = float(data.get("broker_price", 0) or 0)
+        driver_pay = float(data.get("driver_pay", 0) or 0)
+        miles = float(data.get("miles", 0) or 0)
+        loads_per_day = int(data.get("loads_per_day", 0) or 0)
         dispatcher_commission_percent = float(
             data.get("dispatcher_commission_percent", 0) or 0
         )
+
+        profit, margin = calculate_profit_and_margin(broker_price, driver_pay)
+        reference_number = generate_reference_number(company_id)
 
         cursor.execute("""
             INSERT INTO shipments (
@@ -118,7 +177,7 @@ def create_shipment(data, staff_id):
                 %s, %s, %s, %s
             )
         """, (
-            data["company_id"],
+            company_id,
             reference_number,
             data.get("unit_number"),
             assigned_staff_id,
@@ -131,12 +190,12 @@ def create_shipment(data, staff_id):
             data.get("delivery_city"),
             data.get("delivery_state"),
             data.get("delivery_datetime"),
-            data.get("miles", 0),
+            miles,
             broker_price,
             driver_pay,
             profit,
             margin,
-            data.get("loads_per_day", 0),
+            loads_per_day,
             dispatcher_commission_percent,
             data.get("shipment_status", "created"),
             data.get("payment_status", "unpaid"),
@@ -164,9 +223,15 @@ def create_shipment(data, staff_id):
             "percentage_of_margin": margin
         }
 
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
-        return {"error": str(e)}
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create shipment: {str(e)}"
+        )
 
     finally:
         cursor.close()
@@ -189,24 +254,16 @@ def get_my_shipments_service(current_user):
                 SELECT *
                 FROM shipments
                 WHERE assigned_staff_id = %s
-                  AND is_deleted = FALSE
-                ORDER BY created_at DESC
+                ORDER BY shipment_created_date DESC, shipment_id DESC
             """, (staff_id,))
         else:
             cursor.execute("""
                 SELECT *
                 FROM shipments
-                WHERE is_deleted = FALSE
-                ORDER BY created_at DESC
+                ORDER BY shipment_created_date DESC, shipment_id DESC
             """)
 
         shipments = cursor.fetchall()
-
-        if role == "updater":
-            for shipment in shipments:
-                shipment.pop("broker_price", None)
-                shipment.pop("driver_pay", None)
-                shipment.pop("profit", None)
 
         return shipments
 
@@ -223,23 +280,13 @@ def get_all_shipments_service(current_user):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        role = current_user["role"]
-
         cursor.execute("""
             SELECT *
             FROM shipments
-            WHERE is_deleted = FALSE
-            ORDER BY created_at DESC
+            ORDER BY shipment_created_date DESC, shipment_id DESC
         """)
 
         shipments = cursor.fetchall()
-
-        if role == "updater":
-            for shipment in shipments:
-                shipment.pop("broker_price", None)
-                shipment.pop("driver_pay", None)
-                shipment.pop("profit", None)
-
         return shipments
 
     finally:
@@ -259,13 +306,15 @@ def get_shipment_by_id(shipment_id):
             SELECT *
             FROM shipments
             WHERE shipment_id = %s
-              AND is_deleted = FALSE
         """, (shipment_id,))
 
         shipment = cursor.fetchone()
 
         if not shipment:
-            return {"error": "Shipment not found"}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Shipment not found"
+            )
 
         return shipment
 
@@ -286,16 +335,25 @@ def update_shipment_service(shipment_id, data, current_user):
             SELECT *
             FROM shipments
             WHERE shipment_id = %s
-              AND is_deleted = FALSE
         """, (shipment_id,))
         existing = cursor.fetchone()
 
         if not existing:
-            return {"error": "Shipment not found"}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Shipment not found"
+            )
+
+        company_id = data.get("company_id", existing["company_id"])
+        assigned_staff_id = data.get("assigned_staff_id", existing["assigned_staff_id"])
+
+        validate_company(company_id)
+        validate_staff(assigned_staff_id)
 
         updated_values = {
+            "company_id": company_id,
             "unit_number": data.get("unit_number", existing["unit_number"]),
-            "assigned_staff_id": data.get("assigned_staff_id", existing["assigned_staff_id"]),
+            "assigned_staff_id": assigned_staff_id,
             "driver_name": data.get("driver_name", existing["driver_name"]),
             "business_name": data.get("business_name", existing["business_name"]),
             "broker_name": data.get("broker_name", existing["broker_name"]),
@@ -305,12 +363,15 @@ def update_shipment_service(shipment_id, data, current_user):
             "delivery_city": data.get("delivery_city", existing["delivery_city"]),
             "delivery_state": data.get("delivery_state", existing["delivery_state"]),
             "delivery_datetime": data.get("delivery_datetime", existing["delivery_datetime"]),
-            "miles": data.get("miles", existing["miles"]),
+            "miles": float(data.get("miles", existing["miles"]) or 0),
             "broker_price": float(data.get("broker_price", existing["broker_price"]) or 0),
             "driver_pay": float(data.get("driver_pay", existing["driver_pay"]) or 0),
-            "loads_per_day": data.get("loads_per_day", existing["loads_per_day"]),
+            "loads_per_day": int(data.get("loads_per_day", existing["loads_per_day"]) or 0),
             "dispatcher_commission_percent": float(
-                data.get("dispatcher_commission_percent", existing["dispatcher_commission_percent"]) or 0
+                data.get(
+                    "dispatcher_commission_percent",
+                    existing["dispatcher_commission_percent"]
+                ) or 0
             ),
             "shipment_status": data.get("shipment_status", existing["shipment_status"]),
             "payment_status": data.get("payment_status", existing["payment_status"]),
@@ -327,7 +388,8 @@ def update_shipment_service(shipment_id, data, current_user):
 
         cursor.execute("""
             UPDATE shipments
-            SET unit_number = %s,
+            SET company_id = %s,
+                unit_number = %s,
                 assigned_staff_id = %s,
                 driver_name = %s,
                 business_name = %s,
@@ -351,6 +413,7 @@ def update_shipment_service(shipment_id, data, current_user):
                 comments = %s
             WHERE shipment_id = %s
         """, (
+            updated_values["company_id"],
             updated_values["unit_number"],
             updated_values["assigned_staff_id"],
             updated_values["driver_name"],
@@ -379,6 +442,7 @@ def update_shipment_service(shipment_id, data, current_user):
         conn.commit()
 
         tracked_fields = [
+            "company_id",
             "unit_number",
             "assigned_staff_id",
             "driver_name",
@@ -425,61 +489,15 @@ def update_shipment_service(shipment_id, data, current_user):
             "percentage_of_margin": updated_values["percentage_of_margin"]
         }
 
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
-        return {"error": str(e)}
-
-    finally:
-        cursor.close()
-        conn.close()
-
-
-# =======================================================
-# SOFT DELETE SHIPMENT
-# =======================================================
-def delete_shipment_service(shipment_id, current_user):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-
-    try:
-        cursor.execute("""
-            SELECT shipment_id, reference_number
-            FROM shipments
-            WHERE shipment_id = %s
-              AND is_deleted = FALSE
-        """, (shipment_id,))
-        shipment = cursor.fetchone()
-
-        if not shipment:
-            return {"error": "Shipment not found or already deleted"}
-
-        cursor.execute("""
-            UPDATE shipments
-            SET is_deleted = TRUE,
-                deleted_at = NOW(),
-                deleted_by = %s
-            WHERE shipment_id = %s
-        """, (current_user["staff_id"], shipment_id))
-
-        conn.commit()
-
-        log_shipment_change(
-            shipment_id=shipment_id,
-            staff_id=current_user["staff_id"],
-            field_name="is_deleted",
-            old_value=False,
-            new_value=True,
-            note=f"Shipment {shipment['reference_number']} soft deleted"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update shipment: {str(e)}"
         )
-
-        return {
-            "message": "Shipment deleted successfully",
-            "shipment_id": shipment_id
-        }
-
-    except Exception as e:
-        conn.rollback()
-        return {"error": str(e)}
 
     finally:
         cursor.close()
