@@ -4,373 +4,360 @@ from data.db import get_connection
 # =============================
 # DISPATCHER DASHBOARD
 # =============================
-
 def dispatcher_dashboard(staff_id):
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("""
-        SELECT 
-        DATE_FORMAT(delivery_date,'%Y-%m') as month,
-        SUM(profit) as profit
-        FROM shipments
-        WHERE assigned_staff_id = %s
-        AND shipment_status = 'delivered'
-        AND is_deleted = FALSE
-        GROUP BY month
-        ORDER BY month
-    """, (staff_id,))
+    try:
+        cursor.execute("""
+            SELECT
+                DATE_FORMAT(delivery_datetime, '%Y-%m') AS month,
+                SUM(profit) AS profit
+            FROM shipments
+            WHERE assigned_staff_id = %s
+              AND shipment_status = 'delivered'
+              AND is_deleted = FALSE
+              AND delivery_datetime IS NOT NULL
+            GROUP BY DATE_FORMAT(delivery_datetime, '%Y-%m')
+            ORDER BY month
+        """, (staff_id,))
 
-    monthly_profit = cursor.fetchall()
+        monthly_profit = cursor.fetchall()
 
-    cursor.close()
-    conn.close()
+        return {
+            "type": "dispatcher_dashboard",
+            "monthly_profit": monthly_profit
+        }
 
-    return {
-        "type": "dispatcher_dashboard",
-        "monthly_profit": monthly_profit
-    }
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =============================
 # COMPANY DASHBOARD
 # =============================
-
 def company_dashboard():
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # company profit by month
-    cursor.execute("""
-        SELECT 
-        DATE_FORMAT(delivery_date,'%Y-%m') as month,
-        SUM(profit) as profit
-        FROM shipments
-        WHERE shipment_status='delivered'
-        AND is_deleted = FALSE
-        GROUP BY month
-        ORDER BY month
-    """)
+    try:
+        cursor.execute("""
+            SELECT
+                DATE_FORMAT(delivery_datetime, '%Y-%m') AS month,
+                SUM(profit) AS profit
+            FROM shipments
+            WHERE shipment_status = 'delivered'
+              AND is_deleted = FALSE
+              AND delivery_datetime IS NOT NULL
+            GROUP BY DATE_FORMAT(delivery_datetime, '%Y-%m')
+            ORDER BY month
+        """)
+        company_profit = cursor.fetchall()
 
-    company_profit = cursor.fetchall()
+        cursor.execute("""
+            SELECT
+                s.staff_full_name,
+                COUNT(sh.shipment_id) AS shipments,
+                SUM(sh.profit) AS profit
+            FROM shipments sh
+            JOIN staff s ON s.staff_id = sh.assigned_staff_id
+            WHERE sh.shipment_status = 'delivered'
+              AND sh.is_deleted = FALSE
+            GROUP BY s.staff_id, s.staff_full_name
+            ORDER BY profit DESC
+        """)
+        dispatcher_profit = cursor.fetchall()
 
-    # dispatcher profit
-    cursor.execute("""
-        SELECT 
-        s.staff_full_name,
-        SUM(sh.profit) as profit
-        FROM shipments sh
-        JOIN staff s ON s.staff_id = sh.assigned_staff_id
-        WHERE sh.shipment_status='delivered'
-        AND sh.is_deleted = FALSE
-        GROUP BY s.staff_full_name
-        ORDER BY profit DESC
-    """)
+        return {
+            "type": "company_dashboard",
+            "company_profit_trend": company_profit,
+            "dispatcher_profit": dispatcher_profit
+        }
 
-    dispatcher_profit = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-
-    return {
-        "type": "company_dashboard",
-        "company_profit_trend": company_profit,
-        "dispatcher_profit": dispatcher_profit
-    }
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =============================
 # SUPERVISOR DASHBOARD
 # =============================
-
 def supervisor_dashboard():
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("""
-        SELECT 
-        s.staff_full_name,
-        COUNT(sh.id) as shipments,
-        SUM(sh.profit) as profit
-        FROM shipments sh
-        JOIN staff s ON s.staff_id = sh.assigned_staff_id
-        WHERE sh.shipment_status='delivered'
-        AND sh.is_deleted = FALSE
-        GROUP BY s.staff_full_name
-        ORDER BY profit DESC
-    """)
+    try:
+        cursor.execute("""
+            SELECT
+                s.staff_full_name,
+                COUNT(sh.shipment_id) AS shipments,
+                SUM(sh.profit) AS profit
+            FROM shipments sh
+            JOIN staff s ON s.staff_id = sh.assigned_staff_id
+            WHERE sh.shipment_status = 'delivered'
+              AND sh.is_deleted = FALSE
+            GROUP BY s.staff_id, s.staff_full_name
+            ORDER BY profit DESC
+        """)
 
-    performance = cursor.fetchall()
+        performance = cursor.fetchall()
 
-    cursor.close()
-    conn.close()
+        return {
+            "type": "supervisor_dashboard",
+            "dispatcher_performance": performance
+        }
 
-    return {
-        "type": "supervisor_dashboard",
-        "dispatcher_performance": performance
-    }
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =============================
 # TOP 5 DISPATCHERS
 # =============================
-
 def top_dispatchers():
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("""
-        SELECT 
-        s.staff_full_name,
-        SUM(sh.profit) as profit
-        FROM shipments sh
-        JOIN staff s ON s.staff_id = sh.assigned_staff_id
-        WHERE sh.shipment_status='delivered'
-        AND sh.is_deleted = FALSE
-        GROUP BY s.staff_full_name
-        ORDER BY profit DESC
-        LIMIT 5
-    """)
+    try:
+        cursor.execute("""
+            SELECT
+                s.staff_full_name,
+                COUNT(sh.shipment_id) AS shipments,
+                SUM(sh.profit) AS profit
+            FROM shipments sh
+            JOIN staff s ON s.staff_id = sh.assigned_staff_id
+            WHERE sh.shipment_status = 'delivered'
+              AND sh.is_deleted = FALSE
+            GROUP BY s.staff_id, s.staff_full_name
+            ORDER BY profit DESC
+            LIMIT 5
+        """)
 
-    data = cursor.fetchall()
+        data = cursor.fetchall()
 
-    cursor.close()
-    conn.close()
+        return {
+            "top_dispatchers": data
+        }
 
-    return {
-        "top_dispatchers": data
-    }
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =============================
 # COMPANY NET PROFIT
 # =============================
-
 def company_net_profit():
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # shipment profit
-    cursor.execute("""
-        SELECT SUM(profit) as total_profit
-        FROM shipments
-        WHERE shipment_status='delivered'
-        AND is_deleted = FALSE
-    """)
+    try:
+        cursor.execute("""
+            SELECT COALESCE(SUM(profit), 0) AS total_profit
+            FROM shipments
+            WHERE shipment_status = 'delivered'
+              AND is_deleted = FALSE
+        """)
+        shipment_profit = cursor.fetchone()["total_profit"] or 0
 
-    shipment_profit = cursor.fetchone()["total_profit"] or 0
+        cursor.execute("""
+            SELECT COALESCE(SUM(total_salary), 0) AS payroll
+            FROM salary_records
+        """)
+        payroll = cursor.fetchone()["payroll"] or 0
 
-    # payroll
-    cursor.execute("""
-        SELECT SUM(total_salary) as payroll
-        FROM salary_records
-        WHERE is_active = TRUE
-    """)
+        net_profit = shipment_profit - payroll
 
-    payroll = cursor.fetchone()["payroll"] or 0
+        return {
+            "shipment_profit": shipment_profit,
+            "payroll": payroll,
+            "net_profit": net_profit
+        }
 
-    cursor.close()
-    conn.close()
-
-    net_profit = shipment_profit - payroll
-
-    return {
-        "shipment_profit": shipment_profit,
-        "payroll": payroll,
-        "net_profit": net_profit
-    }
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =============================
 # PAYROLL VS PROFIT CHART
 # =============================
-
 def payroll_vs_profit():
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("""
-        SELECT 
-        DATE_FORMAT(delivery_date,'%Y-%m') as month,
-        SUM(profit) as profit
-        FROM shipments
-        WHERE shipment_status='delivered'
-        AND is_deleted = FALSE
-        GROUP BY month
-        ORDER BY month
-    """)
+    try:
+        cursor.execute("""
+            SELECT
+                DATE_FORMAT(delivery_datetime, '%Y-%m') AS month,
+                SUM(profit) AS profit
+            FROM shipments
+            WHERE shipment_status = 'delivered'
+              AND is_deleted = FALSE
+              AND delivery_datetime IS NOT NULL
+            GROUP BY DATE_FORMAT(delivery_datetime, '%Y-%m')
+            ORDER BY month
+        """)
+        profit_data = cursor.fetchall()
 
-    profit_data = cursor.fetchall()
+        cursor.execute("""
+            SELECT
+                DATE_FORMAT(created_at, '%Y-%m') AS month,
+                SUM(total_salary) AS payroll
+            FROM salary_records
+            GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+            ORDER BY month
+        """)
+        payroll_data = cursor.fetchall()
 
-    cursor.execute("""
-        SELECT 
-        DATE_FORMAT(period_start,'%Y-%m') as month,
-        SUM(total_salary) as payroll
-        FROM salary_records
-        WHERE is_active = TRUE
-        GROUP BY month
-        ORDER BY month
-    """)
+        return {
+            "profit": profit_data,
+            "payroll": payroll_data
+        }
 
-    payroll_data = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-
-    return {
-        "profit": profit_data,
-        "payroll": payroll_data
-    }
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =============================
 # PROFIT GROWTH INDICATOR
 # =============================
-
 def profit_growth_indicator():
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("""
-        SELECT
-        DATE_FORMAT(delivery_date,'%Y-%m') as month,
-        SUM(profit) as profit
-        FROM shipments
-        WHERE shipment_status='delivered'
-        AND is_deleted = FALSE
-        GROUP BY month
-        ORDER BY month DESC
-        LIMIT 2
-    """)
+    try:
+        cursor.execute("""
+            SELECT
+                DATE_FORMAT(delivery_datetime, '%Y-%m') AS month,
+                SUM(profit) AS profit
+            FROM shipments
+            WHERE shipment_status = 'delivered'
+              AND is_deleted = FALSE
+              AND delivery_datetime IS NOT NULL
+            GROUP BY DATE_FORMAT(delivery_datetime, '%Y-%m')
+            ORDER BY month DESC
+            LIMIT 2
+        """)
 
-    rows = cursor.fetchall()
+        rows = cursor.fetchall()
 
-    cursor.close()
-    conn.close()
+        if len(rows) < 2:
+            return {"message": "Not enough data"}
 
-    if len(rows) < 2:
-        return {"message": "Not enough data"}
+        current_month = rows[0]["profit"] or 0
+        last_month = rows[1]["profit"] or 0
 
-    current_month = rows[0]["profit"] or 0
-    last_month = rows[1]["profit"] or 0
+        change = current_month - last_month
 
-    change = current_month - last_month
+        percent = 0
+        if last_month != 0:
+            percent = (change / last_month) * 100
 
-    percent = 0
-    if last_month != 0:
-        percent = (change / last_month) * 100
+        return {
+            "current_month_profit": current_month,
+            "last_month_profit": last_month,
+            "growth_percent": round(percent, 2),
+            "trend": "up" if change > 0 else "down" if change < 0 else "flat"
+        }
 
-    return {
-        "current_month_profit": current_month,
-        "last_month_profit": last_month,
-        "growth_percent": round(percent, 2),
-        "trend": "up" if change > 0 else "down"
-    }
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =============================
 # TOP EMPLOYEES LEADERBOARD
 # =============================
-
 def top_employees_leaderboard():
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("""
-        SELECT
-        s.staff_full_name,
-        SUM(sh.profit) as profit
-        FROM shipments sh
-        JOIN staff s ON s.staff_id = sh.assigned_staff_id
-        WHERE sh.shipment_status='delivered'
-        AND sh.is_deleted = FALSE
-        GROUP BY s.staff_full_name
-        ORDER BY profit DESC
-        LIMIT 5
-    """)
+    try:
+        cursor.execute("""
+            SELECT
+                s.staff_full_name,
+                SUM(sh.profit) AS profit
+            FROM shipments sh
+            JOIN staff s ON s.staff_id = sh.assigned_staff_id
+            WHERE sh.shipment_status = 'delivered'
+              AND sh.is_deleted = FALSE
+            GROUP BY s.staff_id, s.staff_full_name
+            ORDER BY profit DESC
+            LIMIT 5
+        """)
 
-    employees = cursor.fetchall()
+        employees = cursor.fetchall()
 
-    cursor.close()
-    conn.close()
+        leaderboard = []
+        rank = 1
 
-    leaderboard = []
+        for emp in employees:
+            leaderboard.append({
+                "rank": rank,
+                "name": emp["staff_full_name"],
+                "profit": emp["profit"] or 0
+            })
+            rank += 1
 
-    rank = 1
+        return {"leaderboard": leaderboard}
 
-    for emp in employees:
-        leaderboard.append({
-            "rank": rank,
-            "name": emp["staff_full_name"],
-            "profit": emp["profit"] or 0
-        })
-        rank += 1
-
-    return {"leaderboard": leaderboard}
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =============================
 # COMPANY KPI DASHBOARD
 # =============================
-
 def company_kpi_dashboard():
-
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("""
-        SELECT COUNT(*) as shipments
-        FROM shipments
-        WHERE shipment_status='delivered'
-        AND is_deleted = FALSE
-    """)
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) AS shipments
+            FROM shipments
+            WHERE shipment_status = 'delivered'
+              AND is_deleted = FALSE
+        """)
+        shipments = cursor.fetchone()["shipments"]
 
-    shipments = cursor.fetchone()["shipments"]
+        cursor.execute("""
+            SELECT COALESCE(SUM(profit), 0) AS profit
+            FROM shipments
+            WHERE shipment_status = 'delivered'
+              AND is_deleted = FALSE
+        """)
+        profit = cursor.fetchone()["profit"] or 0
 
-    cursor.execute("""
-        SELECT SUM(profit) as profit
-        FROM shipments
-        WHERE shipment_status='delivered'
-        AND is_deleted = FALSE
-    """)
+        cursor.execute("""
+            SELECT COALESCE(SUM(total_salary), 0) AS payroll
+            FROM salary_records
+        """)
+        payroll = cursor.fetchone()["payroll"] or 0
 
-    profit = cursor.fetchone()["profit"] or 0
+        net_profit = profit - payroll
 
-    cursor.execute("""
-        SELECT SUM(total_salary) as payroll
-        FROM salary_records
-        WHERE is_active = TRUE
-    """)
+        return {
+            "total_shipments": shipments,
+            "total_profit": profit,
+            "total_payroll": payroll,
+            "net_profit": net_profit
+        }
 
-    payroll = cursor.fetchone()["payroll"] or 0
-
-    cursor.close()
-    conn.close()
-
-    net_profit = profit - payroll
-
-    return {
-        "total_shipments": shipments,
-        "total_profit": profit,
-        "total_payroll": payroll,
-        "net_profit": net_profit
-    }
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =============================
 # ROLE BASED DASHBOARD
 # =============================
-
 def build_dashboard(user):
-
     role = user["role"]
 
     if role == "dispatcher":

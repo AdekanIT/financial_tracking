@@ -118,6 +118,153 @@ passlib + bcrypt
 python-jose
 
 ---
+<!-- START RECENT UPDATES -->
+## 🔄 Recent Updates & Improvements
+
+### 🔐 Security Improvements
+- Removed plain text password storage  
+- Implemented secure password hashing using **bcrypt**  
+- Authentication now uses only `password_hash`  
+- Improved JWT token validation  
+
+---
+
+### 🗄 Database Refactor
+- Added `is_active` field to `staff` table  
+- Added financial configuration fields:
+  - `base_salary`
+  - `shipment_percentage`  
+- Removed deprecated fields:
+  - `password`
+  - `commission_earned`
+  - `period_from`, `period_to`
+
+---
+
+### 🚚 Shipment System Improvements
+- Removed `shipment_code` field  
+- Implemented structured reference number system:
+
+```text
+[COMPANY_CODE][MM][YYYY][COUNTER]
+```
+Added new fields:
+---
+shipment_status  
+payment_status  
+payment_option  
+
+```
+### 🧾 Soft Delete Implementation
+Shipments are no longer permanently deleted.
+
+```text
+is_deleted = TRUE
+
+Additional fields:
+
+deleted_at
+deleted_by
+
+This preserves shipment history and improves auditability.
+```
+### 🔐 Authentication System Upgrade
+- Removed plain text password storage  
+- Implemented secure password hashing using bcrypt  
+- Authentication now uses only `password_hash`  
+- Improved JWT token validation and security  
+
+---
+
+### 🧾 Soft Delete Implementation
+Shipments are no longer permanently deleted.
+
+is_deleted = TRUE
+
+Additional fields:
+- deleted_at
+- deleted_by
+
+This preserves shipment history and improves auditability.
+
+---
+
+### 📜 Logging System Upgrade
+
+#### Shipment Logs
+- Added field-level tracking:
+  - field_name
+  - old_value
+  - new_value
+  - note
+  - staff_id
+
+This allows full tracking of changes, including who made them and what exactly was modified.
+
+#### User Logs
+- Replaced `action` with `action_type`
+- Added `changed_by`
+- Standardized timestamp field to `created_at`
+
+---
+
+### 💰 Payroll System Refactor
+Updated salary structure:
+
+- period_start
+- period_end
+- shipment_bonus
+- bonus
+- tax_percent
+
+Formula:
+
+Gross Salary = Base Salary + Shipment Bonus + Bonus  
+Tax = Gross * tax_percent / 100  
+Net Salary = Gross - Tax  
+
+---
+
+### 📊 Analytics Improvements
+- Fixed incorrect field references:
+  - delivery_date → delivery_datetime
+  - COUNT(id) → COUNT(shipment_id)
+- Removed invalid dependencies
+- Improved KPI accuracy
+
+---
+
+### ⚙️ Backend Improvements
+- Aligned services with database schema  
+- Removed inconsistent field usage  
+- Improved modular structure  
+- Standardized naming conventions  
+
+---
+
+### 🧠 Business Logic Enhancements
+profit = broker_price - driver_pay
+
+Commission logic:
+- Uses dispatcher_commission_percent (shipment level)
+- Falls back to shipment_percentage (staff level)
+
+---
+
+### 🚀 System Stability Improvements
+- Added database rollback handling  
+- Improved validation logic  
+- Standardized error responses  
+
+---
+
+### 📌 Summary
+The system has been transformed into a:
+
+- Secure backend  
+- Scalable backend  
+- Maintainable backend  
+- Production-ready backend  
 
 <!-- START USER MANAGEMENT -->
 # 👥 User Management System
