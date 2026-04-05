@@ -12,11 +12,11 @@ def dispatcher_dashboard(staff_id):
         cursor.execute("""
             SELECT
                 DATE_FORMAT(delivery_datetime, '%Y-%m') AS month,
-                SUM(profit) AS profit
+                COALESCE(SUM(profit), 0) AS profit
             FROM shipments
             WHERE assigned_staff_id = %s
               AND shipment_status = 'delivered'
-              AND is_deleted = FALSE
+              AND is_deleted = 0
               AND delivery_datetime IS NOT NULL
             GROUP BY DATE_FORMAT(delivery_datetime, '%Y-%m')
             ORDER BY month
@@ -45,10 +45,10 @@ def company_dashboard():
         cursor.execute("""
             SELECT
                 DATE_FORMAT(delivery_datetime, '%Y-%m') AS month,
-                SUM(profit) AS profit
+                COALESCE(SUM(profit), 0) AS profit
             FROM shipments
             WHERE shipment_status = 'delivered'
-              AND is_deleted = FALSE
+              AND is_deleted = 0
               AND delivery_datetime IS NOT NULL
             GROUP BY DATE_FORMAT(delivery_datetime, '%Y-%m')
             ORDER BY month
@@ -59,11 +59,11 @@ def company_dashboard():
             SELECT
                 s.staff_full_name,
                 COUNT(sh.shipment_id) AS shipments,
-                SUM(sh.profit) AS profit
+                COALESCE(SUM(sh.profit), 0) AS profit
             FROM shipments sh
             JOIN staff s ON s.staff_id = sh.assigned_staff_id
             WHERE sh.shipment_status = 'delivered'
-              AND sh.is_deleted = FALSE
+              AND sh.is_deleted = 0
             GROUP BY s.staff_id, s.staff_full_name
             ORDER BY profit DESC
         """)
@@ -92,11 +92,11 @@ def supervisor_dashboard():
             SELECT
                 s.staff_full_name,
                 COUNT(sh.shipment_id) AS shipments,
-                SUM(sh.profit) AS profit
+                COALESCE(SUM(sh.profit), 0) AS profit
             FROM shipments sh
             JOIN staff s ON s.staff_id = sh.assigned_staff_id
             WHERE sh.shipment_status = 'delivered'
-              AND sh.is_deleted = FALSE
+              AND sh.is_deleted = 0
             GROUP BY s.staff_id, s.staff_full_name
             ORDER BY profit DESC
         """)
@@ -125,11 +125,11 @@ def top_dispatchers():
             SELECT
                 s.staff_full_name,
                 COUNT(sh.shipment_id) AS shipments,
-                SUM(sh.profit) AS profit
+                COALESCE(SUM(sh.profit), 0) AS profit
             FROM shipments sh
             JOIN staff s ON s.staff_id = sh.assigned_staff_id
             WHERE sh.shipment_status = 'delivered'
-              AND sh.is_deleted = FALSE
+              AND sh.is_deleted = 0
             GROUP BY s.staff_id, s.staff_full_name
             ORDER BY profit DESC
             LIMIT 5
@@ -158,22 +158,22 @@ def company_net_profit():
             SELECT COALESCE(SUM(profit), 0) AS total_profit
             FROM shipments
             WHERE shipment_status = 'delivered'
-              AND is_deleted = FALSE
+              AND is_deleted = 0
         """)
-        shipment_profit = cursor.fetchone()["total_profit"] or 0
+        shipment_profit = float(cursor.fetchone()["total_profit"] or 0)
 
         cursor.execute("""
             SELECT COALESCE(SUM(total_salary), 0) AS payroll
             FROM salary_records
         """)
-        payroll = cursor.fetchone()["payroll"] or 0
+        payroll = float(cursor.fetchone()["payroll"] or 0)
 
         net_profit = shipment_profit - payroll
 
         return {
-            "shipment_profit": shipment_profit,
-            "payroll": payroll,
-            "net_profit": net_profit
+            "shipment_profit": round(shipment_profit, 2),
+            "payroll": round(payroll, 2),
+            "net_profit": round(net_profit, 2)
         }
 
     finally:
@@ -192,10 +192,10 @@ def payroll_vs_profit():
         cursor.execute("""
             SELECT
                 DATE_FORMAT(delivery_datetime, '%Y-%m') AS month,
-                SUM(profit) AS profit
+                COALESCE(SUM(profit), 0) AS profit
             FROM shipments
             WHERE shipment_status = 'delivered'
-              AND is_deleted = FALSE
+              AND is_deleted = 0
               AND delivery_datetime IS NOT NULL
             GROUP BY DATE_FORMAT(delivery_datetime, '%Y-%m')
             ORDER BY month
@@ -205,7 +205,7 @@ def payroll_vs_profit():
         cursor.execute("""
             SELECT
                 DATE_FORMAT(created_at, '%Y-%m') AS month,
-                SUM(total_salary) AS payroll
+                COALESCE(SUM(total_salary), 0) AS payroll
             FROM salary_records
             GROUP BY DATE_FORMAT(created_at, '%Y-%m')
             ORDER BY month
@@ -233,10 +233,10 @@ def profit_growth_indicator():
         cursor.execute("""
             SELECT
                 DATE_FORMAT(delivery_datetime, '%Y-%m') AS month,
-                SUM(profit) AS profit
+                COALESCE(SUM(profit), 0) AS profit
             FROM shipments
             WHERE shipment_status = 'delivered'
-              AND is_deleted = FALSE
+              AND is_deleted = 0
               AND delivery_datetime IS NOT NULL
             GROUP BY DATE_FORMAT(delivery_datetime, '%Y-%m')
             ORDER BY month DESC
@@ -248,8 +248,8 @@ def profit_growth_indicator():
         if len(rows) < 2:
             return {"message": "Not enough data"}
 
-        current_month = rows[0]["profit"] or 0
-        last_month = rows[1]["profit"] or 0
+        current_month = float(rows[0]["profit"] or 0)
+        last_month = float(rows[1]["profit"] or 0)
 
         change = current_month - last_month
 
@@ -258,8 +258,8 @@ def profit_growth_indicator():
             percent = (change / last_month) * 100
 
         return {
-            "current_month_profit": current_month,
-            "last_month_profit": last_month,
+            "current_month_profit": round(current_month, 2),
+            "last_month_profit": round(last_month, 2),
             "growth_percent": round(percent, 2),
             "trend": "up" if change > 0 else "down" if change < 0 else "flat"
         }
@@ -280,11 +280,11 @@ def top_employees_leaderboard():
         cursor.execute("""
             SELECT
                 s.staff_full_name,
-                SUM(sh.profit) AS profit
+                COALESCE(SUM(sh.profit), 0) AS profit
             FROM shipments sh
             JOIN staff s ON s.staff_id = sh.assigned_staff_id
             WHERE sh.shipment_status = 'delivered'
-              AND sh.is_deleted = FALSE
+              AND sh.is_deleted = 0
             GROUP BY s.staff_id, s.staff_full_name
             ORDER BY profit DESC
             LIMIT 5
@@ -299,7 +299,7 @@ def top_employees_leaderboard():
             leaderboard.append({
                 "rank": rank,
                 "name": emp["staff_full_name"],
-                "profit": emp["profit"] or 0
+                "profit": float(emp["profit"] or 0)
             })
             rank += 1
 
@@ -322,31 +322,31 @@ def company_kpi_dashboard():
             SELECT COUNT(*) AS shipments
             FROM shipments
             WHERE shipment_status = 'delivered'
-              AND is_deleted = FALSE
+              AND is_deleted = 0
         """)
-        shipments = cursor.fetchone()["shipments"]
+        shipments = int(cursor.fetchone()["shipments"] or 0)
 
         cursor.execute("""
             SELECT COALESCE(SUM(profit), 0) AS profit
             FROM shipments
             WHERE shipment_status = 'delivered'
-              AND is_deleted = FALSE
+              AND is_deleted = 0
         """)
-        profit = cursor.fetchone()["profit"] or 0
+        profit = float(cursor.fetchone()["profit"] or 0)
 
         cursor.execute("""
             SELECT COALESCE(SUM(total_salary), 0) AS payroll
             FROM salary_records
         """)
-        payroll = cursor.fetchone()["payroll"] or 0
+        payroll = float(cursor.fetchone()["payroll"] or 0)
 
         net_profit = profit - payroll
 
         return {
             "total_shipments": shipments,
-            "total_profit": profit,
-            "total_payroll": payroll,
-            "net_profit": net_profit
+            "total_profit": round(profit, 2),
+            "total_payroll": round(payroll, 2),
+            "net_profit": round(net_profit, 2)
         }
 
     finally:
@@ -355,18 +355,18 @@ def company_kpi_dashboard():
 
 
 # =============================
-# ROLE BASED DASHBOARD
+# ROLE-BASED DASHBOARD
 # =============================
 def build_dashboard(user):
-    role = user["role"]
+    job_title = user["job_title"]
 
-    if role == "dispatcher":
+    if job_title == "dispatcher":
         return dispatcher_dashboard(user["staff_id"])
 
-    if role in ["manager", "accounting"]:
+    if job_title in ["manager", "accounting"]:
         return company_dashboard()
 
-    if role == "supervisor":
+    if job_title == "supervisor":
         return supervisor_dashboard()
 
     return {"message": "No analytics available"}

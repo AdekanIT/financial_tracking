@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from data.db import require_roles
 from services.user_service import (
     create_user,
@@ -10,8 +10,10 @@ from services.user_service import (
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
+
 # =====================================================
 # CREATE USER
+# manager + hr
 # =====================================================
 @router.post("/create")
 def create_user_endpoint(
@@ -21,7 +23,7 @@ def create_user_endpoint(
     password: str,
     current_user: dict = Depends(require_roles(["manager", "hr"]))
 ):
-    return create_user(
+    result = create_user(
         staff_username=staff_username,
         staff_full_name=full_name,
         job_title=job_title,
@@ -29,8 +31,15 @@ def create_user_endpoint(
         created_by=current_user["staff_id"]
     )
 
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return result
+
+
 # =====================================================
 # CHANGE PASSWORD
+# manager + hr
 # =====================================================
 @router.post("/change-password")
 def change_password_endpoint(
@@ -38,14 +47,21 @@ def change_password_endpoint(
     new_password: str,
     current_user: dict = Depends(require_roles(["manager", "hr"]))
 ):
-    return change_password(
+    result = change_password(
         staff_id=staff_id,
         new_password=new_password,
         changed_by=current_user["staff_id"]
     )
 
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return result
+
+
 # =====================================================
 # CHANGE STATUS
+# manager only
 # =====================================================
 @router.post("/change-status")
 def change_status_endpoint(
@@ -53,26 +69,35 @@ def change_status_endpoint(
     is_active: bool,
     current_user: dict = Depends(require_roles(["manager"]))
 ):
-    return change_user_status(
+    result = change_user_status(
         staff_id=staff_id,
         is_active=is_active,
         changed_by=current_user["staff_id"]
     )
 
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return result
+
+
 # =====================================================
 # GET ALL USERS
+# manager + hr
 # =====================================================
-@router.get("/")
-def list_users(
-    current_user: dict = Depends(require_roles(["manager", "accounting"]))
+@router.get("/all")
+def get_all_users_endpoint(
+    current_user: dict = Depends(require_roles(["manager", "hr"]))
 ):
     return get_all_users()
 
+
 # =====================================================
-# USER LOGS
+# GET USER LOGS
+# manager + hr
 # =====================================================
 @router.get("/logs")
-def list_user_logs(
-    current_user: dict = Depends(require_roles(["manager"]))
+def get_user_logs_endpoint(
+    current_user: dict = Depends(require_roles(["manager", "hr"]))
 ):
     return get_user_logs()

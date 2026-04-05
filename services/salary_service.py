@@ -66,13 +66,13 @@ def calculate_shipment_bonus(staff_id: int, start_date, end_date) -> float:
 
         cursor.execute("""
             SELECT
-                profit,
+                COALESCE(profit, 0) AS profit,
                 dispatcher_commission_percent
             FROM shipments
             WHERE assigned_staff_id = %s
               AND DATE(delivery_datetime) BETWEEN %s AND %s
               AND shipment_status = 'delivered'
-              AND is_deleted = FALSE
+              AND is_deleted = 0
         """, (staff_id, start_date, end_date))
 
         shipments = cursor.fetchall()
@@ -151,10 +151,10 @@ def generate_salary_for_period(
             "staff_id": staff_id,
             "period_start": start_date,
             "period_end": end_date,
-            "base_salary": base_salary,
-            "shipment_bonus": shipment_bonus,
-            "bonus": bonus,
-            "tax_percent": tax_percent,
+            "base_salary": round(base_salary, 2),
+            "shipment_bonus": round(shipment_bonus, 2),
+            "bonus": round(bonus, 2),
+            "tax_percent": round(tax_percent, 2),
             "gross_salary": round(gross_salary, 2),
             "tax_amount": round(tax_amount, 2),
             "total_salary": round(total_salary, 2)

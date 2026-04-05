@@ -29,13 +29,20 @@ SECRET_KEY = os.getenv(
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 # ======================================================
-# ROLE GROUPS
+# JOB TITLE GROUPS
 # ======================================================
-ADMIN_ROLES = ["admin", "manager"]
-FINANCE_ROLES = ["admin", "manager", "accounting"]
-SUPERVISOR_ROLES = ["admin", "manager", "supervisor"]
-STAFF_CREATOR_ROLES = ["admin", "manager", "supervisor", "hr"]
-ALL_AUTHORIZED = ["admin", "manager", "accounting", "supervisor", "hr", "dispatcher", "tracking"]
+ADMIN_JOB_TITLES = ["manager"]
+FINANCE_JOB_TITLES = ["manager", "accounting"]
+SUPERVISOR_JOB_TITLES = ["manager", "supervisor"]
+STAFF_CREATOR_JOB_TITLES = ["manager", "supervisor", "hr"]
+ALL_AUTHORIZED_JOB_TITLES = [
+    "manager",
+    "accounting",
+    "supervisor",
+    "hr",
+    "dispatcher",
+    "tracking"
+]
 
 # ======================================================
 # SECURITY
@@ -48,13 +55,19 @@ security = HTTPBearer()
 # ======================================================
 def get_connection():
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        return conn
+        return mysql.connector.connect(**DB_CONFIG)
     except Error as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database connection failed: {str(e)}"
         )
+
+
+# ======================================================
+# NORMALIZE JOB TITLE
+# ======================================================
+def normalize_job_title(job_title: str) -> str:
+    return (job_title or "").strip().lower()
 
 
 # ======================================================
@@ -67,9 +80,9 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
         staff_id = payload.get("staff_id")
-        role = payload.get("role")
+        job_title = payload.get("job_title")
 
-        if not staff_id or not role:
+        if staff_id is None or job_title is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token payload"
@@ -77,7 +90,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
         return {
             "staff_id": staff_id,
-            "role": role
+            "job_title": normalize_job_title(job_title)
         }
 
     except JWTError:
@@ -88,22 +101,30 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
 
 # ======================================================
-# ROLE CHECKERS
+# GENERIC RBAC CHECKER
 # ======================================================
-def require_roles(allowed_roles: list):
+def require_roles(allowed_job_titles: list):
+    allowed_normalized = [normalize_job_title(title) for title in allowed_job_titles]
+
     def role_checker(current_user: dict = Depends(get_current_user)):
-        if current_user["role"] not in allowed_roles:
+        current_job_title = normalize_job_title(current_user.get("job_title"))
+
+        if current_job_title not in allowed_normalized:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
             )
+
         return current_user
 
     return role_checker
 
 
+# ======================================================
+# PRESET ACCESS HELPERS
+# ======================================================
 def require_admin(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ADMIN_ROLES:
+    if current_user["job_title"] not in ADMIN_JOB_TITLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
@@ -112,7 +133,7 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 
 
 def require_finance(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in FINANCE_ROLES:
+    if current_user["job_title"] not in FINANCE_JOB_TITLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Finance access required"
@@ -121,7 +142,7 @@ def require_finance(current_user: dict = Depends(get_current_user)):
 
 
 def require_supervisor(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in SUPERVISOR_ROLES:
+    if current_user["job_title"] not in SUPERVISOR_JOB_TITLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Supervisor access required"
@@ -130,7 +151,7 @@ def require_supervisor(current_user: dict = Depends(get_current_user)):
 
 
 def require_staff_creator(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in STAFF_CREATOR_ROLES:
+    if current_user["job_title"] not in STAFF_CREATOR_JOB_TITLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Staff creation access required"
@@ -139,7 +160,7 @@ def require_staff_creator(current_user: dict = Depends(get_current_user)):
 
 
 def require_authorized(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ALL_AUTHORIZED:
+    if current_user["job_title"] not in ALL_AUTHORIZED_JOB_TITLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Authorized user access required"

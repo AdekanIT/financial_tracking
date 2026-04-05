@@ -9,7 +9,8 @@ from services.shipment_service import (
     get_my_shipments_service,
     get_all_shipments_service,
     get_shipment_by_id,
-    update_shipment_service
+    update_shipment_service,
+    delete_shipment_service
 )
 
 from data.db import get_current_user, require_roles
@@ -24,6 +25,7 @@ class ShipmentCreate(BaseModel):
     company_id: int
     assigned_staff_id: Optional[int] = None
     unit_number: Optional[str] = None
+    external_reference: Optional[str] = None
     driver_name: Optional[str] = None
     business_name: Optional[str] = None
     broker_name: Optional[str] = None
@@ -45,9 +47,12 @@ class ShipmentCreate(BaseModel):
 
 
 class ShipmentUpdate(BaseModel):
+    shipment_id: int
     company_id: Optional[int] = None
+    company_reference: Optional[str] = None
     assigned_staff_id: Optional[int] = None
     unit_number: Optional[str] = None
+    external_reference: Optional[str] = None
     driver_name: Optional[str] = None
     business_name: Optional[str] = None
     broker_name: Optional[str] = None
@@ -68,19 +73,23 @@ class ShipmentUpdate(BaseModel):
     comments: Optional[str] = None
 
 
+class ShipmentDelete(BaseModel):
+    shipment_id: int
+
+
 # =======================================================
-# CREATE SHIPMENT
+# CREATE
 # =======================================================
 @router.post("/create")
 def create_new_shipment(
     data: ShipmentCreate,
-    current_user: dict = Depends(require_roles(["admin", "manager", "supervisor", "accounting", "dispatcher"]))
+    current_user: dict = Depends(require_roles(["manager", "supervisor", "accounting", "dispatcher"]))
 ):
     return create_shipment(data.model_dump(), current_user["staff_id"])
 
 
 # =======================================================
-# GET MY SHIPMENTS
+# GET MY
 # =======================================================
 @router.get("/my")
 def get_my_shipments(
@@ -90,37 +99,53 @@ def get_my_shipments(
 
 
 # =======================================================
-# GET ALL SHIPMENTS
+# GET ALL
 # =======================================================
 @router.get("/all")
 def get_all_shipments(
-    current_user: dict = Depends(require_roles(["admin", "manager", "supervisor", "accounting"]))
+    current_user: dict = Depends(require_roles(["manager", "supervisor", "accounting"]))
 ):
     return get_all_shipments_service(current_user)
 
 
 # =======================================================
-# GET SHIPMENT BY ID
+# GET ONE
 # =======================================================
 @router.get("/{shipment_id}")
 def get_one_shipment(
     shipment_id: int,
     current_user: dict = Depends(get_current_user)
 ):
-    return get_shipment_by_id(shipment_id)
+    return get_shipment_by_id(shipment_id, current_user)
 
 
 # =======================================================
-# UPDATE SHIPMENT
+# UPDATE (PARTIAL JSON UPDATE)
 # =======================================================
-@router.put("/{shipment_id}")
+@router.put("/update")
 def update_shipment(
-    shipment_id: int,
     data: ShipmentUpdate,
-    current_user: dict = Depends(require_roles(["admin", "manager", "supervisor", "accounting", "dispatcher"]))
+    current_user: dict = Depends(require_roles(["manager", "supervisor", "accounting", "dispatcher"]))
 ):
+    payload = data.model_dump(exclude_unset=True)
+    shipment_id = payload.pop("shipment_id")
+
     return update_shipment_service(
         shipment_id=shipment_id,
-        data=data.model_dump(exclude_unset=True),
+        data=payload,
+        current_user=current_user
+    )
+
+
+# =======================================================
+# DELETE (SOFT)
+# =======================================================
+@router.put("/delete")
+def delete_shipment(
+    data: ShipmentDelete,
+    current_user: dict = Depends(require_roles(["manager", "supervisor"]))
+):
+    return delete_shipment_service(
+        shipment_id=data.shipment_id,
         current_user=current_user
     )

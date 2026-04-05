@@ -4,12 +4,14 @@ from services.auth_service import login_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+
 # ==========================
 # LOGIN REQUEST MODEL
 # ==========================
 class LoginRequest(BaseModel):
     username: str
     password: str
+
 
 # ==========================
 # LOGIN ENDPOINT
@@ -24,13 +26,12 @@ def login(data: LoginRequest):
     if "error" in result:
         raise HTTPException(status_code=403, detail=result["error"])
 
-    # Успешный логин — возвращаем токен и данные пользователя
     return {
         "access_token": result["access_token"],
         "token_type": "bearer",
         "staff_id": result["staff_id"],
         "staff_username": result["staff_username"],
         "staff_full_name": result["staff_full_name"],
-        "role": result["role"],
-        "expires_in": 86400  # 24 часа
+        "job_title": result["job_title"],
+        "expires_in": 86400
     }
