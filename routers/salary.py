@@ -1,149 +1,202 @@
-from fastapi import APIRouter, Depends, HTTPException
 from datetime import date
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from data.db import get_current_user, require_roles, FINANCE_JOB_TITLES, get_connection
-from services.salary_service import generate_salary_for_period
+from data.db import get_current_user, require_roles, FINANCE_JOB_TITLES
+from services.salary_service import (
+    calculate_my_salary_preview,
+    calculate_all_salary_preview,
+    get_saved_salary_for_period,
+    get_all_saved_salary_records_for_period,
+    generate_salary_for_period,
+)
 from services.salary_export_service import generate_salary_excel
 
 router = APIRouter(prefix="/salary", tags=["Salary"])
 
 
+StartDateQuery = Annotated[
+    date,
+    Query(description="Start date in YYYY-MM-DD format. Example: 2026-04-03")
+]
+
+EndDateQuery = Annotated[
+    date,
+    Query(description="End date in YYYY-MM-DD format. Example: 2026-04-06")
+]
+
+
 # =============================
-# MY SALARY (ANY AUTHORIZED USER)
+# MY SALARY PREVIEW
+# Pure calculation for current user
+# No DB record creation
 # =============================
 @router.get("/my")
-def my_salary(current_user: dict = Depends(get_current_user)):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
+def my_salary(
+    start_date: StartDateQuery,
+    end_date: EndDateQuery,
+    current_user: dict = Depends(get_current_user)
+):
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail="start_date cannot be later than end_date"
+        )
 
-    try:
-        cursor.execute("""
-            SELECT *
-            FROM salary_records
-            WHERE staff_id = %s
-            ORDER BY period_start DESC
-        """, (current_user["staff_id"],))
+    result = calculate_my_salary_preview(
+        staff_id=current_user["staff_id"],
+        start_date=start_date,
+        end_date=end_date
+    )
 
-        salaries = cursor.fetchall()
-        return salaries
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
 
-    finally:
-        cursor.close()
-        conn.close()
+    return result
 
 
 # =============================
-# ALL SALARIES (FINANCE JOB TITLES)
+# MY SAVED SALARY RECORD
+# Official generated record for current user
+# =============================
+@router.get("/my-record")
+def my_salary_record(
+    start_date: StartDateQuery,
+    end_date: EndDateQuery,
+    current_user: dict = Depends(get_current_user)
+):
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail="start_date cannot be later than end_date"
+        )
+
+    result = get_saved_salary_for_period(
+        staff_id=current_user["staff_id"],
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return result
+
+
+# =============================
+# ALL SALARY PREVIEW
+# Pure calculation for all staff
+# No DB record creation
+# Finance roles only
 # =============================
 @router.get("/all")
-def all_salaries(current_user: dict = Depends(require_roles(FINANCE_JOB_TITLES))):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
+def all_salary_preview(
+    start_date: StartDateQuery,
+    end_date: EndDateQuery,
+    current_user: dict = Depends(require_roles(FINANCE_JOB_TITLES))
+):
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail="start_date cannot be later than end_date"
+        )
 
-    try:
-        cursor.execute("""
-            SELECT
-                sr.*,
-                s.staff_full_name,
-                s.job_title
-            FROM salary_records sr
-            JOIN staff s ON s.staff_id = sr.staff_id
-            ORDER BY sr.period_start DESC
-        """)
+    result = calculate_all_salary_preview(
+        start_date=start_date,
+        end_date=end_date
+    )
 
-        salaries = cursor.fetchall()
-        return salaries
-
-    finally:
-        cursor.close()
-        conn.close()
+    return result
 
 
 # =============================
-# GENERATE SALARY (MANAGER ONLY)
+# ALL SAVED SALARY RECORDS
+# Official generated records for all staff
+# Finance roles only
+# =============================
+@router.get("/all-records")
+def all_salary_records(
+    start_date: StartDateQuery,
+    end_date: EndDateQuery,
+    current_user: dict = Depends(require_roles(FINANCE_JOB_TITLES))
+):
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail="start_date cannot be later than end_date"
+        )
+
+    result = get_all_saved_salary_records_for_period(
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    return result
+
+
+# =============================
+# GENERATE OFFICIAL SALARY RECORD
+# Manager manually sets base_salary / bonus / tax
+# Shipment commission part is calculated automatically
 # =============================
 @router.post("/generate")
 def generate_salary(
     staff_id: int,
-    start_date: date,
-    end_date: date,
+    start_date: StartDateQuery,
+    end_date: EndDateQuery,
+    base_salary: float = 0.0,
     custom_bonus: float = 0.0,
+    tax_percent: float = 0.0,
     current_user: dict = Depends(require_roles(["manager"]))
 ):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail="start_date cannot be later than end_date"
+        )
 
-    try:
-        cursor.execute("""
-            SELECT id
-            FROM salary_records
-            WHERE staff_id = %s
-              AND period_start = %s
-              AND period_end = %s
-        """, (staff_id, start_date, end_date))
-
-        existing = cursor.fetchone()
-
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail="Salary already generated for this period"
-            )
-
-    finally:
-        cursor.close()
-        conn.close()
-
-    return generate_salary_for_period(
+    result = generate_salary_for_period(
         staff_id=staff_id,
         start_date=start_date,
         end_date=end_date,
-        bonus=custom_bonus
+        base_salary=base_salary,
+        bonus=custom_bonus,
+        tax_percent=tax_percent
     )
+
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return result
 
 
 # =============================
-# EXPORT SALARY (FINANCE JOB TITLES)
+# EXPORT SAVED SALARY RECORDS
+# Finance roles only
 # =============================
 @router.get("/export")
 def export_salary(
-    start_date: date,
-    end_date: date,
+    start_date: StartDateQuery,
+    end_date: EndDateQuery,
     current_user: dict = Depends(require_roles(FINANCE_JOB_TITLES))
 ):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail="start_date cannot be later than end_date"
+        )
 
-    try:
-        cursor.execute("""
-            SELECT
-                s.staff_full_name,
-                s.job_title,
-                sr.period_start,
-                sr.period_end,
-                sr.base_salary,
-                sr.shipment_bonus,
-                sr.bonus,
-                sr.tax_percent,
-                sr.total_salary,
-                sr.created_at
-            FROM salary_records sr
-            JOIN staff s ON s.staff_id = sr.staff_id
-            WHERE sr.period_start >= %s
-              AND sr.period_end <= %s
-            ORDER BY s.staff_full_name
-        """, (start_date, end_date))
-
-        rows = cursor.fetchall()
-
-    finally:
-        cursor.close()
-        conn.close()
+    rows = get_all_saved_salary_records_for_period(
+        start_date=start_date,
+        end_date=end_date
+    )
 
     salary_data = [
         {
             "staff_full_name": row["staff_full_name"],
+            "staff_username": row["staff_username"],
             "job_title": row["job_title"],
             "period_start": row["period_start"],
             "period_end": row["period_end"],
@@ -158,7 +211,7 @@ def export_salary(
     ]
 
     excel_file = generate_salary_excel(salary_data)
-    filename = f"salary_report_{start_date}_{end_date}.xlsx"
+    filename = f"salary_records_{start_date}_{end_date}.xlsx"
 
     return StreamingResponse(
         excel_file,

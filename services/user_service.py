@@ -52,8 +52,8 @@ def create_user(staff_username, staff_full_name, job_title, password, created_by
     cursor = conn.cursor(dictionary=True)
 
     try:
-        staff_username_clean = staff_username.strip()
-        staff_full_name_clean = staff_full_name.strip()
+        staff_username_clean = (staff_username or "").strip()
+        staff_full_name_clean = (staff_full_name or "").strip()
         job_title_clean = validate_job_title(job_title)
 
         if not staff_username_clean:
@@ -121,7 +121,8 @@ def create_user(staff_username, staff_full_name, job_title, password, created_by
             "staff_id": new_staff_id,
             "staff_username": staff_username_clean,
             "staff_full_name": staff_full_name_clean,
-            "job_title": job_title_clean
+            "job_title": job_title_clean,
+            "is_active": True
         }
 
     except Exception as e:
@@ -144,6 +145,17 @@ def change_password(staff_id, new_password, changed_by):
         if not new_password:
             return {"error": "new_password is required"}
 
+        cursor.execute("""
+            SELECT staff_id
+            FROM staff
+            WHERE staff_id = %s
+            LIMIT 1
+        """, (staff_id,))
+        existing = cursor.fetchone()
+
+        if not existing:
+            return {"error": "User not found"}
+
         new_hash = hash_password(new_password)
 
         cursor.execute("""
@@ -151,9 +163,6 @@ def change_password(staff_id, new_password, changed_by):
             SET password_hash = %s
             WHERE staff_id = %s
         """, (new_hash, staff_id))
-
-        if cursor.rowcount == 0:
-            return {"error": "User not found"}
 
         cursor.execute("""
             INSERT INTO user_logs (
@@ -190,13 +199,21 @@ def change_user_status(staff_id, is_active, changed_by):
 
     try:
         cursor.execute("""
+            SELECT staff_id, is_active
+            FROM staff
+            WHERE staff_id = %s
+            LIMIT 1
+        """, (staff_id,))
+        existing = cursor.fetchone()
+
+        if not existing:
+            return {"error": "User not found"}
+
+        cursor.execute("""
             UPDATE staff
             SET is_active = %s
             WHERE staff_id = %s
         """, (is_active, staff_id))
-
-        if cursor.rowcount == 0:
-            return {"error": "User not found"}
 
         action = "activated" if is_active else "deactivated"
 
@@ -241,14 +258,15 @@ def get_all_users():
                 staff_full_name,
                 job_title,
                 is_active,
-                base_salary,
                 created_at
             FROM staff
             ORDER BY created_at DESC
         """)
         users = cursor.fetchall()
-
         return users
+
+    except Exception as e:
+        return {"error": str(e)}
 
     finally:
         cursor.close()
@@ -337,69 +355,6 @@ def update_user_info(staff_id, staff_full_name=None, job_title=None, changed_by=
 
 
 # =======================================================
-# UPDATE BASE SALARY ONLY
-# =======================================================
-def update_user_compensation(staff_id, base_salary=None, shipment_percentage=None, changed_by=None):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-
-    try:
-        cursor.execute("""
-            SELECT
-                staff_id,
-                base_salary
-            FROM staff
-            WHERE staff_id = %s
-            LIMIT 1
-        """, (staff_id,))
-        existing = cursor.fetchone()
-
-        if not existing:
-            return {"error": "User not found"}
-
-        new_base_salary = base_salary if base_salary is not None else existing["base_salary"]
-
-        cursor.execute("""
-            UPDATE staff
-            SET base_salary = %s
-            WHERE staff_id = %s
-        """, (
-            new_base_salary,
-            staff_id
-        ))
-
-        if changed_by is not None:
-            cursor.execute("""
-                INSERT INTO user_logs (
-                    staff_id,
-                    action_type,
-                    changed_by
-                )
-                VALUES (%s, %s, %s)
-            """, (
-                staff_id,
-                "compensation_updated",
-                changed_by
-            ))
-
-        conn.commit()
-
-        return {
-            "message": "Compensation updated successfully",
-            "staff_id": staff_id,
-            "base_salary": new_base_salary
-        }
-
-    except Exception as e:
-        conn.rollback()
-        return {"error": str(e)}
-
-    finally:
-        cursor.close()
-        conn.close()
-
-
-# =======================================================
 # GET USER LOGS
 # =======================================================
 def get_user_logs():
@@ -423,8 +378,10 @@ def get_user_logs():
             ORDER BY ul.created_at DESC
         """)
         logs = cursor.fetchall()
-
         return logs
+
+    except Exception as e:
+        return {"error": str(e)}
 
     finally:
         cursor.close()
