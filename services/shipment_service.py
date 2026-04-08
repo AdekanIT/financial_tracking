@@ -118,7 +118,8 @@ def create_shipment(data, staff_id):
         validate_company(company_id)
 
         assigned_staff_id = data.get("assigned_staff_id", staff_id)
-        validate_staff(assigned_staff_id)
+        staff = validate_staff(assigned_staff_id)
+        staff_full_name = staff["staff_full_name"]
 
         broker_price = float(data.get("broker_price", 0))
         driver_pay = float(data.get("driver_pay", 0))
@@ -133,6 +134,7 @@ def create_shipment(data, staff_id):
                 external_reference,
                 unit_number,
                 assigned_staff_id,
+                staff_full_name,
                 shipment_created_date,
                 driver_name,
                 business_name,
@@ -155,7 +157,7 @@ def create_shipment(data, staff_id):
                 payment_option,
                 comments
             )
-            VALUES (%s,%s,%s,%s,%s,NOW(),
+            VALUES (%s,%s,%s,%s,%s,%s,NOW(),
                     %s,%s,%s,
                     %s,%s,%s,
                     %s,%s,%s,
@@ -167,6 +169,7 @@ def create_shipment(data, staff_id):
             data.get("external_reference"),
             data.get("unit_number"),
             assigned_staff_id,
+            staff_full_name,
             data.get("driver_name"),
             data.get("business_name"),
             data.get("broker_name"),
@@ -310,7 +313,8 @@ def update_shipment_service(shipment_id, data, current_user):
             validate_company(data["company_id"])
 
         if "assigned_staff_id" in data and data["assigned_staff_id"] is not None:
-            validate_staff(data["assigned_staff_id"])
+            staff = validate_staff(data["assigned_staff_id"])
+            data["staff_full_name"] = staff["staff_full_name"]
 
         if "company_reference" in data and data["company_reference"]:
             check_reference_uniqueness(

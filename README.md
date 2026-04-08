@@ -1,50 +1,77 @@
 # 🚛 Financial Tracking and Management System
 
-A backend system for logistics companies to manage shipments, dispatcher commissions, salary calculations, financial analytics, and role-based access — built with **FastAPI** and **MySQL**.
+A backend system for logistics companies to manage shipments, staff operations, salary records, financial reporting, and analytics — built with **FastAPI** and **MySQL**.
 
 ---
 
-## ⚙️ Technology Stack
+## 📌 Overview
+
+The **Financial Tracking and Management System** is a centralized backend platform designed for logistics companies. It covers the full operational cycle from shipment creation to salary payouts and profit analytics, with role-based access control and a complete audit trail.
+
+**Key capabilities:**
+
+- Shipment CRUD with soft delete and financial auto-calculation
+- Dispatcher assignment and commission tracking
+- Salary preview, generation, and Excel export
+- Company profit analytics with period-based breakdowns
+- JWT authentication with role-based access control
+- Full audit logging for shipments and user changes
+
+---
+
+## ⚙️ Tech Stack
 
 | Technology | Purpose |
 |---|---|
 | **FastAPI** | Backend API framework |
 | **MySQL** | Relational database |
-| **mysql-connector-python** | Database connector (raw SQL) |
-| **JWT (python-jose)** | Token-based authentication |
-| **bcrypt** | Password hashing |
+| **mysql-connector-python** | Database connection (raw SQL) |
+| **python-jose** | JWT authentication |
+| **bcrypt / passlib** | Password hashing |
 | **Pydantic** | Request/response validation |
-| **OpenPyXL** | Excel report generation |
-| **Chart.js** | Financial charts *(planned)* |
-
-**Architecture:** Layered — `routers → services → database`
+| **OpenPyXL** | Excel export generation |
 
 ---
 
-## 🏗️ Project Structure
+## 🏗️ Architecture
+
+The project follows a clean layered structure:
+
+```
+routers/    →  API endpoints
+services/   →  Business logic
+data/       →  Database connection & auth helpers
+utils/      →  Shared calculation logic
+```
+
+---
+
+## 🗂️ Project Structure
 
 ```
 FinancialTracking/
 ├── data/
-│   └── db.py                    # Database connection
+│   └── db.py
 ├── routers/
-│   ├── auth.py                  # Authentication endpoints
-│   ├── users.py                 # User management endpoints
-│   ├── shipments.py             # Shipment endpoints
-│   ├── salary.py                # Salary endpoints
-│   └── analytics_router.py      # Analytics endpoints
+│   ├── auth.py
+│   ├── users.py
+│   ├── shipments.py
+│   ├── salary.py
+│   ├── analytics_router.py
+│   └── dashboard.py
 ├── services/
-│   ├── auth_service.py          # Login & token logic
-│   ├── user_service.py          # User CRUD operations
-│   ├── shipment_service.py      # Shipment business logic
-│   ├── salary_service.py        # Salary calculations
-│   ├── analytics_service.py     # Dashboard & KPI logic
-│   └── logging_service.py       # Audit trail logging
+│   ├── auth_service.py
+│   ├── user_service.py
+│   ├── shipment_service.py
+│   ├── salary_service.py
+│   ├── salary_export_service.py
+│   ├── analytics_service.py
+│   └── logging_service.py
 ├── utils/
-│   └── calculations.py          # Shared calculation helpers
-├── templates/                   # HTML templates (frontend)
-├── static/                      # CSS, JS, assets
-├── main.py                      # Application entry point
+│   └── calculations.py
+├── templates/
+├── static/
+├── main.py
 └── requirements.txt
 ```
 
@@ -52,149 +79,224 @@ FinancialTracking/
 
 ## 🗄️ Database Schema
 
+The system uses **6 core tables**:
+
 | Table | Purpose |
 |---|---|
-| `staff` | System users, roles, and credentials |
+| `staff` | System users, roles, salary config |
 | `companies` | Logistics company records |
-| `shipments` | Shipment data and financials |
-| `salary_records` | Official payroll records |
-| `shipment_logs` | Shipment change audit history |
-| `user_logs` | User activity audit trail |
+| `shipments` | Shipment data with financial fields |
+| `salary_records` | Official generated salary records |
+| `shipment_logs` | Shipment audit history |
+| `user_logs` | User/account change history |
+
+### Key Relationships
+
+```
+companies.company_id       → shipments.company_id
+staff.staff_id             → shipments.assigned_staff_id
+staff.staff_id             → salary_records.staff_id
+shipments.shipment_id      → shipment_logs.shipment_id
+staff.staff_id             → user_logs.staff_id / changed_by
+```
 
 ---
 
-## 🔐 Authentication & RBAC
+## 🔐 Authentication & Authorization
 
-The system uses **JWT tokens** for authentication with **bcrypt** password hashing. Tokens expire after 24 hours. All protected routes enforce role-based permissions via FastAPI dependencies.
+- **JWT-based authentication** — login returns a token used for all protected routes
+- **Password hashing** via bcrypt
+- **Role-based access** controlled by `job_title`
 
 | Role | Access Level |
 |---|---|
-| `manager` | Full system access |
-| `supervisor` | Monitoring and oversight |
-| `dispatcher` | Own shipments only |
-| `accounting` | Financial data |
+| `manager` | Full backend access |
+| `supervisor` | Monitoring, oversight, analytics |
+| `dispatcher` | Own shipment data only |
+| `accounting` | Financial and salary data |
 | `hr` | Staff management |
 | `tracking` | Shipment tracking |
 
 ---
 
-## 🚚 Shipment System
+## 🚚 Shipment Module
 
-Each shipment tracks: `broker_price`, `driver_pay`, `profit`, `margin`, and `dispatcher_commission_percent`.
-
-**Business rules:**
-
-- **Profit formula:** `profit = broker_price - driver_pay`
-- **Auto-recalculation:** Updating `broker_price` or `driver_pay` automatically recalculates `profit` and `margin`
-- **Soft delete:** Shipments are never permanently removed — they are flagged with `is_deleted = 1`, `deleted_at`, and `deleted_by`
-- **Deleted shipments** do not affect salary, profit, analytics, or KPIs
-- **Dual references:** Each shipment supports both `company_reference` (internal) and `external_reference` (broker), with uniqueness validation
-- **Partial updates:** Only the fields included in the request body are updated
+- Create, update, and soft-delete shipments
+- Auto-calculated fields: `profit = broker_price - driver_pay`
+- Internal reference auto-generated from company data
+- Staff full name stored as a display snapshot (FK remains `assigned_staff_id`)
+- Soft delete uses `is_deleted`, `deleted_at`, and `deleted_by` — excluded from salary/analytics
 
 ---
 
-## 💰 Salary System
+## 💰 Salary Module
 
-The salary module separates **preview calculations** from **official stored records**.
-
-### Preview vs. Record
-
-| Concept | Description |
-|---|---|
-| **Preview** | Real-time calculation from shipment data — no database write |
-| **Record** | Official payroll entry created by a manager — stored permanently |
-
-### Formulas
+### Calculation Logic
 
 ```
-commission       = profit × commission_percent / 100
-shipment_bonus   = sum of all commissions for the period
-total_salary     = (base_salary + shipment_bonus + bonus) × tax_rate
+profit     = broker_price - driver_pay
+commission = profit × dispatcher_commission_percent / 100
+
+gross_salary = base_salary + shipment_bonus + bonus
+tax_amount   = gross_salary × tax_percent / 100
+total_salary = gross_salary - tax_amount
 ```
 
-### Endpoints
+### Features
 
-| Endpoint | Method | Description |
+- Salary preview (before committing) and official record generation
+- Staff resolution by name with normalization (`john smith` → `John Smith`)
+- If multiple staff match a name, `staff_id` is required to disambiguate
+- Excel export with **Employee Salaries** and **Company Summary** sheets
+- Browser-based export preview endpoint
+
+---
+
+## 📊 Analytics Module
+
+- Role-based dashboard access
+- Company profit analytics grouped by **day**, **week**, or **month**
+- Each period includes nested breakdown data (e.g., month → per-day breakdown)
+- Only periods with delivered shipments are returned
+
+**Example response:**
+
+```json
+{
+  "period_key": "2026-04",
+  "period_label": "2026-04",
+  "shipments": 8,
+  "profit": 3200.0,
+  "gross": 18500.0,
+  "breakdown": [
+    {
+      "label": "2026-04-01",
+      "shipments": 2,
+      "profit": 800.0,
+      "gross": 4500.0
+    }
+  ]
+}
+```
+
+---
+
+## 📜 Audit Logging
+
+All changes are tracked for traceability:
+
+- **Shipment logs** — creation, field updates, status changes, soft deletes
+- **User logs** — role changes, status updates, admin/HR operations
+
+---
+
+## 📡 API Endpoints
+
+### Auth
+| Method | Endpoint | Description |
 |---|---|---|
-| `/salary/my` | GET | Preview salary for current user |
-| `/salary/my-record` | GET | Saved salary record for current user |
-| `/salary/all` | GET | Preview salary for all employees |
-| `/salary/all-records` | GET | All official salary records |
-| `/salary/generate` | POST | Create an official salary record |
+| POST | `/auth/login` | User login |
 
-**Eligibility criteria:** Only shipments where `assigned_staff_id` matches the user, `is_deleted = 0`, and the shipment falls within the selected period are included.
-
----
-
-## 📊 Analytics & Dashboard
-
-The analytics module provides profit trends, dispatcher leaderboards, KPI dashboards, payroll-vs-profit comparisons, and growth indicators. All analytics exclude soft-deleted shipments (`is_deleted = 0`).
-
----
-
-## 📜 Logging System
-
-All changes are tracked with full audit detail: field name, old value, new value, and the user who made the change. This covers shipment creation, updates, reference changes, deletions, and user activity.
-
----
-
-## 📡 API Endpoints Overview
-
-| Group | Endpoint | Method |
+### Users
+| Method | Endpoint | Description |
 |---|---|---|
-| **Auth** | `/auth/login` | POST |
-| **Users** | `/users/create` | POST |
-| | `/users/change-password` | POST |
-| | `/users/change-role` | POST |
-| | `/users/change-status` | POST |
-| **Shipments** | `/shipments/create` | POST |
-| | `/shipments/update` | PUT |
-| | `/shipments/delete` | PUT |
-| **Salary** | `/salary/my` | GET |
-| | `/salary/my-record` | GET |
-| | `/salary/all` | GET |
-| | `/salary/all-records` | GET |
-| | `/salary/generate` | POST |
-| **Analytics** | `/analytics/dashboard` | GET |
-| | `/analytics/kpi` | GET |
+| POST | `/users/create` | Create user |
+| POST | `/users/change-password` | Change password |
+| POST | `/users/change-role` | Change role |
+| POST | `/users/change-status` | Toggle active status |
+
+### Shipments
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/shipments/create` | Create shipment |
+| PUT | `/shipments/update` | Update shipment |
+| PUT | `/shipments/delete` | Soft delete shipment |
+| GET | `/shipments/my` | Current user's shipments |
+| GET | `/shipments/all` | All shipments |
+| GET | `/shipments/{shipment_id}` | Single shipment |
+
+### Salary
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/salary/my` | My salary preview |
+| GET | `/salary/my-record` | My official salary record |
+| GET | `/salary/all` | All salary previews |
+| GET | `/salary/all-records` | All official records |
+| POST | `/salary/generate` | Generate salary record |
+| GET | `/salary/export` | Download Excel export |
+| GET | `/salary/export-preview` | Preview in browser |
+
+### Analytics
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/analytics/dashboard` | Role-based dashboard |
+| GET | `/analytics/company-profit` | Company profit analytics |
 
 ---
 
-## 🚀 Running the Project
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python 3.10+
+- MySQL server running
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/your-username/FinancialTracking.git
+cd FinancialTracking
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Start the server
 uvicorn main:app --reload
 ```
 
-Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+### API Documentation
+
+Once running, open Swagger UI at:
+
+```
+http://127.0.0.1:8000/docs
+```
 
 ---
 
-## 📈 Project Status
+## ✅ Project Status
 
-### ✅ Completed
+### Completed
 
-- JWT authentication
+- JWT authentication & password hashing
 - Role-based access control
+- Staff management (CRUD, role/status changes)
 - Shipment CRUD with soft delete
-- Salary preview and record generation
-- Logging and audit system
-- Database schema finalized
+- Salary preview, generation, and Excel export
+- Analytics dashboard with period breakdowns
+- Audit logging (shipment + user)
+- Full database schema
 
-### 🔧 In Progress
+### In Progress
 
-- Frontend UI (HTML / CSS / JS)
-- Analytics dashboard with Chart.js
-- Excel export from UI
-- Advanced filtering
+- Frontend dashboard (HTML/CSS/JavaScript)
+- Chart rendering and advanced filters
+- Export buttons and table rendering in UI
 
 ---
 
 ## 🎓 Academic Context
 
-| | |
+| Field | Value |
 |---|---|
 | **University** | Bangor University |
 | **Module** | ICE3001 |
-| **Project** | Financial Tracking System |
+| **Project Title** | Financial Tracking and Management System |
+| **Project Type** | Individual Project |
+
+---
+
+## 📄 License
+
+This project was developed as part of an academic module. See your institution's guidelines for usage and distribution.

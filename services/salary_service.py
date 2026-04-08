@@ -3,6 +3,24 @@ from data.db import get_connection
 
 
 # =======================================================
+# NORMALIZE STAFF FULL NAME
+# Example:
+# "john smith" -> "John Smith"
+# "JOHN SMITH" -> "John Smith"
+# =======================================================
+def normalize_staff_full_name(staff_full_name: str) -> str:
+    if not staff_full_name:
+        return ""
+
+    normalized_parts = []
+    for part in staff_full_name.strip().split():
+        if part:
+            normalized_parts.append(part[:1].upper() + part[1:].lower())
+
+    return " ".join(normalized_parts)
+
+
+# =======================================================
 # GET STAFF BASIC INFO
 # =======================================================
 def get_staff_basic_info(staff_id: int):
@@ -21,12 +39,71 @@ def get_staff_basic_info(staff_id: int):
             WHERE staff_id = %s
             LIMIT 1
         """, (staff_id,))
-
         return cursor.fetchone()
 
     finally:
         cursor.close()
         conn.close()
+
+
+# =======================================================
+# GET STAFF BY FULL NAME
+# =======================================================
+def get_staff_by_full_name(staff_full_name: str):
+    normalized_name = normalize_staff_full_name(staff_full_name)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT
+                staff_id,
+                staff_full_name,
+                staff_username,
+                job_title,
+                is_active
+            FROM staff
+            WHERE staff_full_name = %s
+            ORDER BY staff_id ASC
+        """, (normalized_name,))
+        return cursor.fetchall()
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# =======================================================
+# RESOLVE STAFF FOR SALARY GENERATION
+# =======================================================
+def resolve_staff_for_salary_generation(staff_full_name: str, staff_id: int | None = None):
+    normalized_name = normalize_staff_full_name(staff_full_name)
+
+    if not normalized_name:
+        return {"error": "staff_full_name is required"}
+
+    if staff_id is not None:
+        staff = get_staff_basic_info(staff_id)
+
+        if not staff:
+            return {"error": "Staff member not found"}
+
+        db_name_normalized = normalize_staff_full_name(staff["staff_full_name"])
+        if db_name_normalized != normalized_name:
+            return {"error": "Provided staff_id does not match the given staff_full_name"}
+
+        return staff
+
+    matched_staff = get_staff_by_full_name(normalized_name)
+
+    if not matched_staff:
+        return {"error": "Staff member not found"}
+
+    if len(matched_staff) > 1:
+        return {"error": "Multiple staff members found with this full name. Please provide staff_id."}
+
+    return matched_staff[0]
 
 
 # =======================================================
@@ -56,13 +133,6 @@ def get_all_staff():
 
 # =======================================================
 # GET COMMISSION SUMMARY FOR PERIOD
-# Pure preview calculation from shipments
-# Uses:
-# - assigned_staff_id
-# - shipment_created_date
-# - profit
-# - dispatcher_commission_percent
-# - is_deleted = 0
 # =======================================================
 def get_commission_summary_for_period(staff_id: int, start_date: date, end_date: date):
     conn = get_connection()
@@ -126,8 +196,6 @@ def get_commission_summary_for_period(staff_id: int, start_date: date, end_date:
 
 # =======================================================
 # MY SALARY PREVIEW
-# Pure calculation only
-# No insert into salary_records
 # =======================================================
 def calculate_my_salary_preview(staff_id: int, start_date: date, end_date: date):
     try:
@@ -162,8 +230,6 @@ def calculate_my_salary_preview(staff_id: int, start_date: date, end_date: date)
 
 # =======================================================
 # ALL SALARY PREVIEW
-# Pure calculation for all staff
-# No insert into salary_records
 # =======================================================
 def calculate_all_salary_preview(start_date: date, end_date: date):
     if start_date > end_date:
@@ -249,7 +315,6 @@ def get_saved_salary_for_period(staff_id: int, start_date: date, end_date: date)
 
 # =======================================================
 # GET ALL SAVED SALARY RECORDS FOR PERIOD
-# Official records only
 # =======================================================
 def get_all_saved_salary_records_for_period(start_date: date, end_date: date):
     conn = get_connection()
@@ -299,14 +364,83 @@ def get_all_saved_salary_records_for_period(start_date: date, end_date: date):
 
 
 # =======================================================
+# GET EXPORT PREVIEW DATA
+# =======================================================
+def get_salary_export_preview_data(start_date: date, end_date: date):
+    rows = get_all_saved_salary_records_for_period(
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    total_gross = 0.0
+    total_tax = 0.0
+    total_net = 0.0
+    top_employee = ""
+    top_salary = 0.0
+
+    prepared_rows = []
+
+    for row in rows:
+        base_salary = float(row.get("base_salary") or 0)
+        shipment_bonus = float(row.get("shipment_bonus") or 0)
+        bonus = float(row.get("bonus") or 0)
+        tax_percent = float(row.get("tax_percent") or 0)
+        total_salary = float(row.get("total_salary") or 0)
+
+        gross_salary = base_salary + shipment_bonus + bonus
+        tax_amount = gross_salary * tax_percent / 100
+
+        prepared_row = {
+            "salary_id": row.get("salary_id"),
+            "staff_id": row.get("staff_id"),
+            "staff_full_name": row.get("staff_full_name", ""),
+            "staff_username": row.get("staff_username", ""),
+            "job_title": row.get("job_title", ""),
+            "period_start": str(row.get("period_start", "")),
+            "period_end": str(row.get("period_end", "")),
+            "base_salary": round(base_salary, 2),
+            "shipment_bonus": round(shipment_bonus, 2),
+            "bonus": round(bonus, 2),
+            "gross_salary": round(gross_salary, 2),
+            "tax_percent": round(tax_percent, 2),
+            "tax_amount": round(tax_amount, 2),
+            "total_salary": round(total_salary, 2),
+            "created_at": str(row.get("created_at", ""))
+        }
+
+        prepared_rows.append(prepared_row)
+
+        total_gross += gross_salary
+        total_tax += tax_amount
+        total_net += total_salary
+
+        if total_salary > top_salary:
+            top_salary = total_salary
+            top_employee = row.get("staff_full_name", "")
+
+    summary = {
+        "total_records": len(prepared_rows),
+        "total_gross": round(total_gross, 2),
+        "total_tax": round(total_tax, 2),
+        "total_net": round(total_net, 2),
+        "top_employee": top_employee,
+        "top_salary": round(top_salary, 2)
+    }
+
+    return {
+        "rows": prepared_rows,
+        "summary": summary
+    }
+
+
+# =======================================================
 # GENERATE OFFICIAL SALARY RECORD
-# Manager enters base_salary manually
-# Commission part is calculated automatically from shipments
 # =======================================================
 def generate_salary_for_period(
-    staff_id: int,
+    staff_full_name: str,
     start_date: date,
     end_date: date,
+    staff_id: int | None = None,
     base_salary: float = 0.0,
     bonus: float = 0.0,
     tax_percent: float = 0.0
@@ -318,9 +452,15 @@ def generate_salary_for_period(
         if start_date > end_date:
             return {"error": "start_date cannot be later than end_date"}
 
-        staff = get_staff_basic_info(staff_id)
-        if not staff:
-            return {"error": "User not found"}
+        staff = resolve_staff_for_salary_generation(
+            staff_full_name=staff_full_name,
+            staff_id=staff_id
+        )
+
+        if "error" in staff:
+            return staff
+
+        resolved_staff_id = staff["staff_id"]
 
         cursor.execute("""
             SELECT salary_id
@@ -329,14 +469,14 @@ def generate_salary_for_period(
               AND period_start = %s
               AND period_end = %s
             LIMIT 1
-        """, (staff_id, start_date, end_date))
+        """, (resolved_staff_id, start_date, end_date))
 
         existing = cursor.fetchone()
         if existing:
             return {"error": "Salary already generated for this period"}
 
         summary = get_commission_summary_for_period(
-            staff_id=staff_id,
+            staff_id=resolved_staff_id,
             start_date=start_date,
             end_date=end_date
         )
@@ -363,7 +503,7 @@ def generate_salary_for_period(
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            staff_id,
+            resolved_staff_id,
             start_date,
             end_date,
             round(base_salary, 2),

@@ -1,5 +1,8 @@
-from openpyxl import Workbook
 from io import BytesIO
+
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
+from openpyxl.utils import get_column_letter
 
 
 def generate_salary_excel(salary_data):
@@ -13,6 +16,7 @@ def generate_salary_excel(salary_data):
 
     headers = [
         "Employee",
+        "Username",
         "Role",
         "Period Start",
         "Period End",
@@ -28,11 +32,16 @@ def generate_salary_excel(salary_data):
 
     ws.append(headers)
 
+    # Header styling
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
     total_gross = 0.0
     total_tax = 0.0
     total_net = 0.0
 
-    top_employee = None
+    top_employee = ""
     top_salary = 0.0
 
     for row in salary_data:
@@ -45,9 +54,14 @@ def generate_salary_excel(salary_data):
         gross_salary = base_salary + shipment_bonus + bonus
         tax_amount = gross_salary * tax_percent / 100
 
+        employee_name = row.get("staff_full_name") or row.get("employee") or ""
+        username = row.get("staff_username") or row.get("username") or ""
+        job_title = row.get("job_title") or row.get("role") or ""
+
         ws.append([
-            row.get("staff_full_name") or row.get("employee"),
-            row.get("job_title") or row.get("role"),
+            employee_name,
+            username,
+            job_title,
             str(row.get("period_start", "")),
             str(row.get("period_end", "")),
             round(base_salary, 2),
@@ -66,12 +80,13 @@ def generate_salary_excel(salary_data):
 
         if net_salary > top_salary:
             top_salary = net_salary
-            top_employee = row.get("staff_full_name") or row.get("employee")
+            top_employee = employee_name
 
-    # итоговая строка
+    # TOTAL row
     ws.append([])
     ws.append([
         "TOTAL",
+        "",
         "",
         "",
         "",
@@ -85,6 +100,30 @@ def generate_salary_excel(salary_data):
         ""
     ])
 
+    total_row_index = ws.max_row
+    for cell in ws[total_row_index]:
+        cell.font = Font(bold=True)
+
+    # Column widths
+    desired_widths = {
+        1: 24,   # Employee
+        2: 18,   # Username
+        3: 16,   # Role
+        4: 14,   # Period Start
+        5: 14,   # Period End
+        6: 14,   # Base Salary
+        7: 16,   # Shipment Bonus
+        8: 12,   # Bonus
+        9: 14,   # Gross Salary
+        10: 12,  # Tax Percent
+        11: 12,  # Tax Amount
+        12: 14,  # Net Salary
+        13: 22   # Created At
+    }
+
+    for col_idx, width in desired_widths.items():
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
     # =============================
     # SHEET 2 — COMPANY SUMMARY
     # =============================
@@ -96,6 +135,12 @@ def generate_salary_excel(salary_data):
     ws2.append(["Total Net Salaries", round(total_net, 2)])
     ws2.append(["Top Employee", top_employee])
     ws2.append(["Top Net Salary", round(top_salary, 2)])
+
+    for cell in ws2[1]:
+        cell.font = Font(bold=True)
+
+    ws2.column_dimensions["A"].width = 24
+    ws2.column_dimensions["B"].width = 20
 
     # =============================
     # SAVE FILE
