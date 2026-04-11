@@ -8,7 +8,7 @@ A backend system for logistics companies to manage shipments, staff operations, 
 
 The **Financial Tracking and Management System** is a centralized backend platform designed for logistics companies. It covers the full operational cycle from shipment creation to salary payouts and profit analytics, with role-based access control and a complete audit trail.
 
-**Key capabilities:**
+### Key capabilities
 
 - Shipment CRUD with soft delete and financial auto-calculation
 - Dispatcher assignment and commission tracking
@@ -38,10 +38,10 @@ The **Financial Tracking and Management System** is a centralized backend platfo
 The project follows a clean layered structure:
 
 ```
-routers/    →  API endpoints
-services/   →  Business logic
-data/       →  Database connection & auth helpers
-utils/      →  Shared calculation logic
+routers/    → API endpoints
+services/   → Business logic
+data/       → Database connection & auth helpers
+utils/      → Shared calculation logic
 ```
 
 ---
@@ -93,7 +93,7 @@ The system uses **6 core tables**:
 ### Key Relationships
 
 ```
-companies.company_id       → shipments.company_id
+companies.company_id      → shipments.company_id
 staff.staff_id             → shipments.assigned_staff_id
 staff.staff_id             → salary_records.staff_id
 shipments.shipment_id      → shipment_logs.shipment_id
@@ -108,12 +108,14 @@ staff.staff_id             → user_logs.staff_id / changed_by
 - **Password hashing** via bcrypt
 - **Role-based access** controlled by `job_title`
 
+### Roles
+
 | Role | Access Level |
 |---|---|
 | `manager` | Full backend access |
-| `supervisor` | Monitoring, oversight, analytics |
-| `dispatcher` | Own shipment data only |
-| `accounting` | Financial and salary data |
+| `supervisor` | Monitoring, analytics |
+| `dispatcher` | Own shipments only |
+| `accounting` | Financial & salary data |
 | `hr` | Staff management |
 | `tracking` | Shipment tracking |
 
@@ -122,10 +124,18 @@ staff.staff_id             → user_logs.staff_id / changed_by
 ## 🚚 Shipment Module
 
 - Create, update, and soft-delete shipments
-- Auto-calculated fields: `profit = broker_price - driver_pay`
-- Internal reference auto-generated from company data
-- Staff full name stored as a display snapshot (FK remains `assigned_staff_id`)
-- Soft delete uses `is_deleted`, `deleted_at`, and `deleted_by` — excluded from salary/analytics
+- Auto-calculated field:
+
+```
+profit = broker_price - driver_pay
+```
+
+- Internal reference auto-generated
+- Staff full name stored as snapshot
+- Soft delete system:
+  - `is_deleted`
+  - `deleted_at`
+  - `deleted_by`
 
 ---
 
@@ -137,29 +147,35 @@ staff.staff_id             → user_logs.staff_id / changed_by
 profit     = broker_price - driver_pay
 commission = profit × dispatcher_commission_percent / 100
 
-gross_salary = base_salary + shipment_bonus + bonus
-tax_amount   = gross_salary × tax_percent / 100
-total_salary = gross_salary - tax_amount
+gross_salary  = base_salary + shipment_bonus + bonus
+tax_amount    = gross_salary × tax_percent / 100
+total_salary  = gross_salary - tax_amount
 ```
 
 ### Features
 
-- Salary preview (before committing) and official record generation
-- Staff resolution by name with normalization (`john smith` → `John Smith`)
-- If multiple staff match a name, `staff_id` is required to disambiguate
-- Excel export with **Employee Salaries** and **Company Summary** sheets
-- Browser-based export preview endpoint
+- Salary preview before generation
+- Official salary record creation
+- Name normalization (`john smith → John Smith`)
+- Duplicate name handling via `staff_id`
+- Excel export with:
+  - Employee Salaries
+  - Company Summary
+- Browser preview for export
 
 ---
 
 ## 📊 Analytics Module
 
-- Role-based dashboard access
-- Company profit analytics grouped by **day**, **week**, or **month**
-- Each period includes nested breakdown data (e.g., month → per-day breakdown)
-- Only periods with delivered shipments are returned
+- Role-based dashboard
+- Profit analytics grouped by:
+  - Day
+  - Week
+  - Month
+- Nested breakdown support
+- Only delivered shipments counted
 
-**Example response:**
+### Example response
 
 ```json
 {
@@ -183,54 +199,66 @@ total_salary = gross_salary - tax_amount
 
 ## 📜 Audit Logging
 
-All changes are tracked for traceability:
+All changes are tracked:
 
-- **Shipment logs** — creation, field updates, status changes, soft deletes
-- **User logs** — role changes, status updates, admin/HR operations
+- **Shipment logs**
+  - creation
+  - updates
+  - status changes
+  - soft delete
+- **User logs**
+  - role changes
+  - status updates
+  - admin/HR actions
 
 ---
 
 ## 📡 API Endpoints
 
 ### Auth
+
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/auth/login` | User login |
 
 ### Users
+
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/users/create` | Create user |
 | POST | `/users/change-password` | Change password |
 | POST | `/users/change-role` | Change role |
-| POST | `/users/change-status` | Toggle active status |
+| POST | `/users/change-status` | Toggle status |
 
 ### Shipments
+
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/shipments/create` | Create shipment |
 | PUT | `/shipments/update` | Update shipment |
-| PUT | `/shipments/delete` | Soft delete shipment |
-| GET | `/shipments/my` | Current user's shipments |
+| PUT | `/shipments/delete` | Soft delete |
+| GET | `/shipments/my` | My shipments |
 | GET | `/shipments/all` | All shipments |
-| GET | `/shipments/{shipment_id}` | Single shipment |
+| GET | `/shipments/{id}` | Single shipment |
 
 ### Salary
+
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/salary/my` | My salary preview |
-| GET | `/salary/my-record` | My official salary record |
-| GET | `/salary/all` | All salary previews |
-| GET | `/salary/all-records` | All official records |
-| POST | `/salary/generate` | Generate salary record |
-| GET | `/salary/export` | Download Excel export |
-| GET | `/salary/export-preview` | Preview in browser |
+| GET | `/salary/my` | My preview |
+| GET | `/salary/my-record` | My record |
+| GET | `/salary/all` | All previews |
+| GET | `/salary/all-records` | All records |
+| POST | `/salary/generate` | Generate salary |
+| GET | `/salary/export` | Download Excel |
+| GET | `/salary/export-preview` | Preview |
 
 ### Analytics
+
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/analytics/dashboard` | Role-based dashboard |
-| GET | `/analytics/company-profit` | Company profit analytics |
+| GET | `/analytics/dashboard` | Dashboard |
+| GET | `/analytics/company-profit` | Profit analytics |
 
 ---
 
@@ -239,25 +267,19 @@ All changes are tracked for traceability:
 ### Prerequisites
 
 - Python 3.10+
-- MySQL server running
+- MySQL
 
 ### Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/your-username/FinancialTracking.git
 cd FinancialTracking
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Start the server
 uvicorn main:app --reload
 ```
 
-### API Documentation
-
-Once running, open Swagger UI at:
+### Swagger UI
 
 ```
 http://127.0.0.1:8000/docs
@@ -269,20 +291,18 @@ http://127.0.0.1:8000/docs
 
 ### Completed
 
-- JWT authentication & password hashing
-- Role-based access control
-- Staff management (CRUD, role/status changes)
-- Shipment CRUD with soft delete
-- Salary preview, generation, and Excel export
-- Analytics dashboard with period breakdowns
-- Audit logging (shipment + user)
-- Full database schema
+- ✅ Authentication & RBAC
+- ✅ Shipment module
+- ✅ Salary system + Excel export
+- ✅ Analytics
+- ✅ Audit logging
+- ✅ Database schema
 
 ### In Progress
 
-- Frontend dashboard (HTML/CSS/JavaScript)
-- Chart rendering and advanced filters
-- Export buttons and table rendering in UI
+- 🔧 Frontend (HTML / CSS / JS)
+- 🔧 Charts & filters
+- 🔧 UI export tools
 
 ---
 
@@ -292,11 +312,11 @@ http://127.0.0.1:8000/docs
 |---|---|
 | **University** | Bangor University |
 | **Module** | ICE3001 |
-| **Project Title** | Financial Tracking and Management System |
-| **Project Type** | Individual Project |
+| **Project** | Financial Tracking System |
+| **Type** | Individual Project |
 
 ---
 
 ## 📄 License
 
-This project was developed as part of an academic module. See your institution's guidelines for usage and distribution.
+This project was developed for academic purposes.

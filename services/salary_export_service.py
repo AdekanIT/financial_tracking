@@ -32,7 +32,6 @@ def generate_salary_excel(salary_data):
 
     ws.append(headers)
 
-    # Header styling
     for cell in ws[1]:
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -82,7 +81,6 @@ def generate_salary_excel(salary_data):
             top_salary = net_salary
             top_employee = employee_name
 
-    # TOTAL row
     ws.append([])
     ws.append([
         "TOTAL",
@@ -104,21 +102,20 @@ def generate_salary_excel(salary_data):
     for cell in ws[total_row_index]:
         cell.font = Font(bold=True)
 
-    # Column widths
     desired_widths = {
-        1: 24,   # Employee
-        2: 18,   # Username
-        3: 16,   # Role
-        4: 14,   # Period Start
-        5: 14,   # Period End
-        6: 14,   # Base Salary
-        7: 16,   # Shipment Bonus
-        8: 12,   # Bonus
-        9: 14,   # Gross Salary
-        10: 12,  # Tax Percent
-        11: 12,  # Tax Amount
-        12: 14,  # Net Salary
-        13: 22   # Created At
+        1: 24,
+        2: 18,
+        3: 16,
+        4: 14,
+        5: 14,
+        6: 14,
+        7: 16,
+        8: 12,
+        9: 14,
+        10: 12,
+        11: 12,
+        12: 14,
+        13: 22
     }
 
     for col_idx, width in desired_widths.items():
@@ -142,9 +139,6 @@ def generate_salary_excel(salary_data):
     ws2.column_dimensions["A"].width = 24
     ws2.column_dimensions["B"].width = 20
 
-    # =============================
-    # SAVE FILE
-    # =============================
     stream = BytesIO()
     wb.save(stream)
     stream.seek(0)

@@ -261,7 +261,7 @@ def calculate_all_salary_preview(start_date: date, end_date: date):
 
 
 # =======================================================
-# GET SAVED SALARY RECORD FOR EXACT PERIOD
+# GET MY SAVED SALARY RECORDS FOR PERIOD RANGE
 # =======================================================
 def get_saved_salary_for_period(staff_id: int, start_date: date, end_date: date):
     conn = get_connection()
@@ -286,27 +286,28 @@ def get_saved_salary_for_period(staff_id: int, start_date: date, end_date: date)
             FROM salary_records sr
             JOIN staff s ON s.staff_id = sr.staff_id
             WHERE sr.staff_id = %s
-              AND sr.period_start = %s
-              AND sr.period_end = %s
-            LIMIT 1
+              AND sr.period_start >= %s
+              AND sr.period_end <= %s
+            ORDER BY sr.period_start DESC, sr.salary_id DESC
         """, (staff_id, start_date, end_date))
 
-        record = cursor.fetchone()
+        rows = cursor.fetchall()
 
-        if not record:
-            return {"error": "Salary for this period has not been generated yet"}
+        if not rows:
+            return {"error": "No saved salary records found for this period"}
 
-        gross_salary = (
-            float(record["base_salary"] or 0)
-            + float(record["shipment_bonus"] or 0)
-            + float(record["bonus"] or 0)
-        )
-        tax_amount = gross_salary * float(record["tax_percent"] or 0) / 100
+        for row in rows:
+            gross_salary = (
+                float(row["base_salary"] or 0)
+                + float(row["shipment_bonus"] or 0)
+                + float(row["bonus"] or 0)
+            )
+            tax_amount = gross_salary * float(row["tax_percent"] or 0) / 100
 
-        record["gross_salary"] = round(gross_salary, 2)
-        record["tax_amount"] = round(tax_amount, 2)
+            row["gross_salary"] = round(gross_salary, 2)
+            row["tax_amount"] = round(tax_amount, 2)
 
-        return record
+        return rows
 
     finally:
         cursor.close()

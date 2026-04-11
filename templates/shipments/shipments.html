@@ -3,10 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <title>Shipments</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <link rel="stylesheet" href="/static/css/style.css?v=7">
     <style>
         :root {
             color-scheme: dark;
+            --bg-main: #0b1118;
+            --bg-soft: rgba(18, 24, 33, 0.94);
+            --bg-card: rgba(18, 24, 33, 0.92);
+            --bg-input: #0d131b;
+            --text-main: #e5eefb;
+            --text-soft: #8ea0b8;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-2: #2563eb;
+            --border-soft: rgba(147, 197, 253, 0.14);
+            --border-strong: rgba(120, 170, 255, 0.18);
+            --shadow-blue: 0 0 24px rgba(59, 130, 246, 0.10);
+            --month-text: #a7b7cc;
         }
 
         html, body {
@@ -20,6 +33,24 @@
             background-size: cover;
         }
 
+        body {
+            transition: background 0.25s ease;
+        }
+
+        .icon-svg {
+            width: 18px;
+            height: 18px;
+            display: inline-block;
+            vertical-align: middle;
+            color: #ffffff;
+            flex: 0 0 auto;
+        }
+
+        .icon-svg.large {
+            width: 19px;
+            height: 19px;
+        }
+
         body.sidebar-collapsed .sidebar {
             width: 88px;
             min-width: 88px;
@@ -29,18 +60,13 @@
 
         body.sidebar-collapsed .sidebar .logo-title,
         body.sidebar-collapsed .sidebar .nav-link-text,
-        body.sidebar-collapsed .sidebar .logout-btn span,
-        body.sidebar-collapsed .sidebar .sidebar-toggle-btn span:last-child {
+        body.sidebar-collapsed .sidebar .logout-btn span:last-child {
             display: none;
         }
 
         body.sidebar-collapsed .sidebar .nav-link {
             justify-content: center;
             padding: 14px 10px;
-        }
-
-        body.sidebar-collapsed .sidebar .sidebar-toggle-btn {
-            justify-content: center;
         }
 
         body.sidebar-collapsed .sidebar .logout-btn {
@@ -71,21 +97,50 @@
             color: #dce7f5;
             border-radius: 12px;
             height: 38px;
+            width: 38px;
             min-width: 38px;
-            padding: 0 12px;
+            padding: 0;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
             cursor: pointer;
             transition: 0.18s ease;
-            font-size: 13px;
-            font-weight: 700;
+            position: relative;
+            overflow: hidden;
         }
 
         .sidebar-toggle-btn:hover {
             background: rgba(59, 130, 246, 0.12);
             border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .toggle-icon {
+            position: absolute;
+            inset: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .toggle-icon-open {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .toggle-icon-close {
+            opacity: 0;
+            transform: scale(0.7) rotate(-90deg);
+        }
+
+        body.sidebar-collapsed .toggle-icon-open {
+            opacity: 0;
+            transform: scale(0.7) rotate(90deg);
+        }
+
+        body.sidebar-collapsed .toggle-icon-close {
+            opacity: 1;
+            transform: scale(1);
         }
 
         .sidebar-nav {
@@ -101,10 +156,12 @@
         }
 
         .nav-link-icon {
-            font-size: 16px;
             width: 18px;
             min-width: 18px;
-            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
         }
 
         .logout-btn {
@@ -188,20 +245,6 @@
             box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
         }
 
-        input[type="date"],
-        input[type="month"],
-        input[type="time"] {
-            color-scheme: dark;
-        }
-
-        input[type="date"]::-webkit-calendar-picker-indicator,
-        input[type="month"]::-webkit-calendar-picker-indicator,
-        input[type="time"]::-webkit-calendar-picker-indicator {
-            filter: invert(1) brightness(1.4);
-            opacity: 1;
-            cursor: pointer;
-        }
-
         .control-card,
         .table-card {
             background: rgba(18, 24, 33, 0.92);
@@ -221,11 +264,6 @@
             flex-wrap: wrap;
             align-items: center;
             justify-content: flex-start;
-        }
-
-        .shipments-control-header .compact-select {
-            width: auto;
-            min-width: 130px;
         }
 
         .animated-panel {
@@ -287,7 +325,7 @@
         }
 
         .input-with-picker input {
-            padding-right: 42px;
+            padding-right: 44px;
         }
 
         .picker-launch-btn {
@@ -298,14 +336,57 @@
             border: none;
             background: transparent;
             color: #ffffff;
-            font-size: 16px;
-            line-height: 1;
+            width: 24px;
+            height: 24px;
+            padding: 0;
             cursor: pointer;
             opacity: 0.96;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .picker-launch-btn:hover {
             opacity: 1;
+        }
+
+        .picker-launch-btn svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+        }
+
+        .custom-trigger {
+            position: relative;
+            width: 100%;
+        }
+
+        .custom-trigger-input {
+            width: 100%;
+            padding-right: 42px !important;
+        }
+
+        .custom-trigger-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #ffffff;
+            pointer-events: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .custom-trigger-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+        }
+
+        .top-format-trigger {
+            min-width: 150px;
+            width: 150px;
         }
 
         .column-toolbar-grid {
@@ -471,7 +552,7 @@
             min-width: 60px;
             max-width: 60px;
             overflow: visible !important;
-            z-index: 120;
+            z-index: 2;
         }
 
         .action-menu-btn {
@@ -492,32 +573,30 @@
             border-color: rgba(96, 165, 250, 0.34);
         }
 
-        .action-dropdown {
-            position: absolute;
-            right: 42px;
-            top: 0;
-            min-width: 180px;
-            max-width: 180px;
+        .floating-action-menu {
+            position: fixed;
+            min-width: 190px;
+            max-width: 190px;
             background: rgba(14, 19, 28, 0.995);
             border: 1px solid rgba(120, 170, 255, 0.18);
             border-radius: 12px;
             box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
             padding: 6px;
-            display: none;
-            z-index: 999;
-            transform: translateY(4px) translateX(-6px) scale(0.98);
+            z-index: 6000;
+            transform: translateY(6px) scale(0.98);
             opacity: 0;
+            pointer-events: none;
             transition: opacity 0.14s ease, transform 0.14s ease;
             backdrop-filter: blur(8px);
         }
 
-        .action-dropdown.open {
-            display: block;
+        .floating-action-menu.open {
             opacity: 1;
-            transform: translateY(0) translateX(0) scale(1);
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
         }
 
-        .action-dropdown button {
+        .floating-action-menu button {
             width: 100%;
             text-align: left;
             padding: 8px 10px;
@@ -530,7 +609,7 @@
             transition: 0.18s ease;
         }
 
-        .action-dropdown button:hover {
+        .floating-action-menu button:hover {
             background: rgba(59, 130, 246, 0.10);
         }
 
@@ -707,14 +786,21 @@
             font-size: 13px;
         }
 
-        .date-modal-content {
+        .date-modal-content,
+        .month-modal-content,
+        .time-modal-content,
+        .format-modal-content {
             max-width: 360px !important;
             width: 94% !important;
             padding: 18px;
             border-radius: 20px;
+            overflow: hidden;
         }
 
-        .date-modal-header {
+        .date-modal-header,
+        .month-modal-header,
+        .time-modal-header,
+        .format-modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -722,18 +808,24 @@
             margin-bottom: 14px;
         }
 
-        .date-modal-title {
+        .date-modal-title,
+        .month-modal-title,
+        .time-modal-title,
+        .format-modal-title {
             font-size: 16px;
             font-weight: 700;
             color: #e2e8f0;
         }
 
-        .date-modal-nav {
+        .date-modal-nav,
+        .month-modal-nav {
             display: flex;
             gap: 8px;
         }
 
-        .date-nav-btn {
+        .date-nav-btn,
+        .month-nav-btn,
+        .time-step-btn {
             width: 34px;
             height: 34px;
             border-radius: 10px;
@@ -743,7 +835,9 @@
             cursor: pointer;
         }
 
-        .date-nav-btn:hover {
+        .date-nav-btn:hover,
+        .month-nav-btn:hover,
+        .time-step-btn:hover {
             background: rgba(59, 130, 246, 0.10);
         }
 
@@ -794,11 +888,143 @@
             border-color: rgba(96, 165, 250, 0.35);
         }
 
-        .date-modal-footer {
+        .date-modal-footer,
+        .month-modal-footer,
+        .time-modal-footer,
+        .format-modal-footer {
             display: flex;
             justify-content: space-between;
             gap: 10px;
             margin-top: 16px;
+        }
+
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .month-btn {
+            height: 44px;
+            border-radius: 12px;
+            border: 1px solid rgba(147, 197, 253, 0.14);
+            background: rgba(255,255,255,0.03);
+            color: #dbe7f5;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            transition: 0.15s ease;
+        }
+
+        .month-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.24);
+        }
+
+        .month-btn.active {
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+            color: #fff;
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .time-picker-layout {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 10px;
+            align-items: start;
+        }
+
+        .time-column-label {
+            text-align: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #8ea0b8;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .time-column {
+            display: grid;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .time-display {
+            height: 48px;
+            border-radius: 14px;
+            border: 1px solid rgba(147, 197, 253, 0.16);
+            background: rgba(255,255,255,0.04);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 800;
+        }
+
+        .time-separator {
+            align-self: center;
+            padding-top: 24px;
+            font-size: 28px;
+            font-weight: 800;
+            color: #dce7f5;
+        }
+
+        .ampm-toggle {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .ampm-btn,
+        .format-option-btn {
+            height: 42px;
+            border-radius: 12px;
+            border: 1px solid rgba(147, 197, 253, 0.16);
+            background: rgba(255,255,255,0.03);
+            color: #dbe7f5;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            transition: 0.15s ease;
+        }
+
+        .ampm-btn:hover,
+        .format-option-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.24);
+        }
+
+        .ampm-btn.active,
+        .format-option-btn.active {
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+            color: #fff;
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .time-preview-box {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(96, 165, 250, 0.20);
+            color: #dbeafe;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .format-option-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .field-error {
+            border-color: rgba(248, 113, 113, 0.55) !important;
+            box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.08) !important;
         }
 
         @media (max-width: 1300px) {
@@ -831,46 +1057,136 @@
             .filter-grid {
                 grid-template-columns: 1fr;
             }
+
+            .time-picker-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .time-separator {
+                display: none;
+            }
         }
     </style>
 </head>
 <body class="dashboard-body">
 
+<svg width="0" height="0" style="position:absolute;visibility:hidden">
+    <symbol id="icon-calendar" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="16" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-dashboard" viewBox="0 0 24 24">
+        <path d="M4 18L9 12L13 15L20 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M18 7H20V9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <symbol id="icon-box" viewBox="0 0 24 24">
+        <path d="M12 3L20 7V17L12 21L4 17V7L12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M4 7L12 11L20 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M12 11V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-dollar" viewBox="0 0 24 24">
+        <path d="M12 3V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M16.5 7.5C16.5 5.8 14.5 4.5 12 4.5C9.5 4.5 7.5 5.8 7.5 7.8C7.5 9.6 9 10.4 12 11C15 11.6 16.5 12.4 16.5 14.5C16.5 16.5 14.6 18 12 18C9.4 18 7.5 16.7 7.5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-user" viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M5 20C6.8 16.8 9 15.5 12 15.5C15 15.5 17.2 16.8 19 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-logout" viewBox="0 0 24 24">
+        <path d="M15 16L20 12L15 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 12H9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M12 4H6C4.9 4 4 4.9 4 6V18C4 19.1 4.9 20 6 20H12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-menu-open" viewBox="0 0 24 24">
+        <path d="M4 7H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M4 12H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M4 17H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-menu-close" viewBox="0 0 24 24">
+        <path d="M9 6L15 12L9 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <symbol id="icon-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+        <path d="M12 8V12L15 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </symbol>
+
+    <symbol id="icon-chevron-down" viewBox="0 0 24 24">
+        <path d="M6 9L12 15L18 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </symbol>
+
+    <symbol id="icon-archive" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="4" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M5 9H19V19H5Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M9 13H15" stroke="currentColor" stroke-width="1.8"/>
+    </symbol>
+</svg>
+
 <aside class="sidebar">
     <div class="sidebar-top">
         <div class="logo-wrap">
             <h2 class="logo-title">FTMS</h2>
-            <button id="toggleSidebarBtn" class="sidebar-toggle-btn" type="button" title="Toggle Sidebar">
-                <span>⇆</span>
-                <span>Toggle</span>
+            <button id="toggleSidebarBtn" class="sidebar-toggle-btn" type="button" title="Toggle Sidebar" aria-label="Toggle Sidebar">
+                <span class="toggle-icon toggle-icon-open">
+                    <svg class="icon-svg"><use href="#icon-menu-open"></use></svg>
+                </span>
+                <span class="toggle-icon toggle-icon-close">
+                    <svg class="icon-svg"><use href="#icon-menu-close"></use></svg>
+                </span>
             </button>
         </div>
 
         <nav class="sidebar-nav">
             <a href="/dashboard" class="nav-link">
-                <span class="nav-link-icon">📊</span>
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-dashboard"></use></svg>
+                </span>
                 <span class="nav-link-text">Dashboard</span>
             </a>
 
             <a href="/shipments" class="nav-link active">
-                <span class="nav-link-icon">📦</span>
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-box"></use></svg>
+                </span>
                 <span class="nav-link-text">Shipments</span>
             </a>
 
             <a href="/salary" class="nav-link">
-                <span class="nav-link-icon">💵</span>
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-dollar"></use></svg>
+                </span>
                 <span class="nav-link-text">Salary</span>
             </a>
 
             <a href="/users" class="nav-link">
-                <span class="nav-link-icon">👤</span>
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-user"></use></svg>
+                </span>
                 <span class="nav-link-text">Users</span>
+            </a>
+
+            <a href="/archive" class="nav-link">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-archive"></use></svg>
+                </span>
+                <span class="nav-link-text">Archive</span>
             </a>
         </nav>
     </div>
 
     <button id="logoutBtn" class="logout-btn">
-        <span>⎋</span>
+        <span class="nav-link-icon">
+            <svg class="icon-svg"><use href="#icon-logout"></use></svg>
+        </span>
         <span>Logout</span>
     </button>
 </aside>
@@ -884,15 +1200,30 @@
     </div>
 
     <div class="control-card">
+        <div id="confirmDeleteShipmentModal" class="modal" style="display:none;">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <h2>Delete Shipment</h2>
+                <p>Are you sure you want to delete this shipment?</p>
+
+                <div class="modal-actions">
+                    <button id="cancelDeleteShipmentBtn" class="secondary-btn" type="button">Cancel</button>
+                    <button id="confirmDeleteShipmentBtn" class="login-btn" type="button">Delete</button>
+                </div>
+            </div>
+        </div>
+
         <div class="shipments-control-header">
             <button class="primary-blue-btn" onclick="openCreateModal()">Create Shipment</button>
             <button id="toggleColumnsBtn" class="small-btn" type="button">Column Manager</button>
             <button id="toggleFiltersBtn" class="small-btn" type="button">Filters</button>
 
-            <select id="timeFormatSelect" class="compact-select">
-                <option value="12">AM / PM</option>
-                <option value="24">24 Hours</option>
-            </select>
+            <div class="custom-trigger top-format-trigger">
+                <input id="timeFormatDisplay" class="compact-input custom-trigger-input" type="text" readonly value="AM / PM">
+                <input id="timeFormatSelect" type="hidden" value="12">
+                <span class="custom-trigger-icon" aria-hidden="true">
+                    <svg class="icon-svg"><use href="#icon-chevron-down"></use></svg>
+                </span>
+            </div>
         </div>
 
         <div id="filtersPanel" class="animated-panel">
@@ -914,8 +1245,10 @@
                     <div class="filter-field">
                         <label for="filterCreatedDate">Created Date</label>
                         <div class="input-with-picker">
-                            <input id="filterCreatedDate" class="compact-input" type="text" placeholder="dd/mm/yyyy">
-                            <button id="filterCreatedDatePickerBtn" class="picker-launch-btn" type="button" title="Pick date">◻</button>
+                            <input id="filterCreatedDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
+                            <button id="filterCreatedDatePickerBtn" class="picker-launch-btn" type="button" title="Pick date" aria-label="Pick created date">
+                                <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                            </button>
                         </div>
                     </div>
 
@@ -926,7 +1259,12 @@
 
                     <div class="filter-field">
                         <label for="filterMonth">Month</label>
-                        <input id="filterMonth" class="compact-input" type="month" title="Select month">
+                        <div class="input-with-picker">
+                            <input id="filterMonth" class="compact-input" type="text" placeholder="Select month" readonly>
+                            <button id="filterMonthPickerBtn" class="picker-launch-btn" type="button" title="Pick month" aria-label="Pick month">
+                                <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -962,97 +1300,127 @@
         <div class="shipments-table-wrap">
             <table class="data-table shipments-table">
                 <thead>
-                <tr id="shipmentsHeaderRow"></tr>
+                    <tr id="shipmentsHeaderRow"></tr>
                 </thead>
                 <tbody id="shipmentsTable">
-                <tr>
-                    <td colspan="25" class="empty-row">Loading...</td>
-                </tr>
+                    <tr>
+                        <td colspan="25" class="empty-row">Loading...</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
     </div>
 </main>
 
+<div id="floatingActionMenu" class="floating-action-menu"></div>
+
 <div id="shipmentModal" class="modal">
     <div class="modal-content">
         <h2 id="shipmentModalTitle">Create Shipment</h2>
         <p class="modal-subtitle">Fill in shipment details and save to the system</p>
 
-        <form id="shipmentForm" class="modal-form">
+        <form id="shipmentForm" class="modal-form" novalidate>
             <input type="hidden" id="edit_shipment_id">
 
             <div class="form-grid">
                 <div class="form-group">
                     <label for="external_reference">Broker Reference</label>
-                    <input type="text" id="external_reference" placeholder="Enter broker reference">
+                    <input type="text" id="external_reference" placeholder="Enter broker reference" required>
                 </div>
 
                 <div class="form-group">
                     <label for="unit_number">Unit Number</label>
-                    <input type="text" id="unit_number" placeholder="Enter unit number">
+                    <input type="text" id="unit_number" placeholder="Enter unit number" required>
                 </div>
 
                 <div class="form-group">
                     <label for="driver_name">Driver Name</label>
-                    <input type="text" id="driver_name" placeholder="Enter driver name">
+                    <input type="text" id="driver_name" placeholder="Enter driver name" required>
                 </div>
 
                 <div class="form-group">
                     <label for="business_name">Business Name</label>
-                    <input type="text" id="business_name" placeholder="Enter business name">
+                    <input type="text" id="business_name" placeholder="Enter business name" required>
                 </div>
 
                 <div class="form-group full-row">
                     <label for="broker_name">Broker Name</label>
-                    <input list="brokerNameSuggestions" type="text" id="broker_name" placeholder="Enter broker name">
+                    <input list="brokerNameSuggestions" type="text" id="broker_name" placeholder="Enter broker name" required>
                     <datalist id="brokerNameSuggestions"></datalist>
                 </div>
 
                 <div class="form-group">
                     <label for="pickup_city">Pickup City</label>
-                    <input type="text" id="pickup_city" placeholder="Enter pickup city">
+                    <input type="text" id="pickup_city" placeholder="Enter pickup city" required>
                 </div>
 
                 <div class="form-group">
                     <label for="pickup_state">Pickup State / Province</label>
-                    <select id="pickup_state"></select>
+                    <select id="pickup_state" required></select>
                 </div>
 
                 <div class="form-group">
                     <label for="pickup_date">Pickup Date</label>
                     <div class="input-with-picker">
-                        <input type="text" id="pickup_date" placeholder="dd/mm/yyyy">
-                        <button id="pickupDatePickerBtn" class="picker-launch-btn" type="button" title="Pick pickup date">◻</button>
+                        <input type="text" id="pickup_date" placeholder="dd/mm/yyyy" autocomplete="off" required>
+                        <button id="pickupDatePickerBtn" class="picker-launch-btn" type="button" title="Pick pickup date">
+                            <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                        </button>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label for="pickup_time">Pickup Time</label>
-                    <input type="time" id="pickup_time" title="Select pickup time">
+                    <div class="custom-trigger">
+                        <input
+                            type="text"
+                            id="pickup_time"
+                            class="custom-trigger-input"
+                            placeholder="Type or double click to select the time"
+                            autocomplete="off"
+                            required
+                        >
+                        <span class="custom-trigger-icon" aria-hidden="true">
+                            <svg class="icon-svg"><use href="#icon-clock"></use></svg>
+                        </span>
+                    </div>
                 </div>
 
                 <div class="form-group">
                     <label for="delivery_city">Delivery City</label>
-                    <input type="text" id="delivery_city" placeholder="Enter delivery city">
+                    <input type="text" id="delivery_city" placeholder="Enter delivery city" required>
                 </div>
 
                 <div class="form-group">
                     <label for="delivery_state">Delivery State / Province</label>
-                    <select id="delivery_state"></select>
+                    <select id="delivery_state" required></select>
                 </div>
 
                 <div class="form-group">
                     <label for="delivery_date">Delivery Date</label>
                     <div class="input-with-picker">
-                        <input type="text" id="delivery_date" placeholder="dd/mm/yyyy">
-                        <button id="deliveryDatePickerBtn" class="picker-launch-btn" type="button" title="Pick delivery date">◻</button>
+                        <input type="text" id="delivery_date" placeholder="dd/mm/yyyy" autocomplete="off" required>
+                        <button id="deliveryDatePickerBtn" class="picker-launch-btn" type="button" title="Pick delivery date">
+                            <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                        </button>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label for="delivery_time">Delivery Time</label>
-                    <input type="time" id="delivery_time" title="Select delivery time">
+                    <div class="custom-trigger">
+                        <input
+                            type="text"
+                            id="delivery_time"
+                            class="custom-trigger-input"
+                            placeholder="Type or double click to select the time"
+                            autocomplete="off"
+                            required
+                        >
+                        <span class="custom-trigger-icon" aria-hidden="true">
+                            <svg class="icon-svg"><use href="#icon-clock"></use></svg>
+                        </span>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -1072,7 +1440,7 @@
 
                 <div class="form-group">
                     <label for="loads_per_day">Loads per Day</label>
-                    <input type="number" id="loads_per_day" placeholder="Enter loads per day">
+                    <input type="number" id="loads_per_day" placeholder="Enter loads per day" required>
                 </div>
 
                 <div class="form-group">
@@ -1177,7 +1545,83 @@
     </div>
 </div>
 
-<script src="/static/js/shipments.js?v=5"></script>
+<div id="monthPickerModal" class="modal">
+    <div class="modal-content month-modal-content">
+        <div class="month-modal-header">
+            <div class="month-modal-title">Select Month</div>
+            <div class="month-modal-nav">
+                <button type="button" id="monthPrevYearBtn" class="month-nav-btn">←</button>
+                <button type="button" id="monthNextYearBtn" class="month-nav-btn">→</button>
+            </div>
+        </div>
 
+        <div class="panel-subtitle" id="monthCurrentYearLabel">2026</div>
+
+        <div id="monthGrid" class="month-grid"></div>
+
+        <div class="month-modal-footer">
+            <button type="button" id="monthClearBtn" class="small-btn">Clear</button>
+            <button type="button" id="monthCloseBtn" class="small-btn">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="timePickerModal" class="modal">
+    <div class="modal-content time-modal-content">
+        <div class="time-modal-header">
+            <div class="time-modal-title" id="timeModalTitle">Select Time</div>
+        </div>
+
+        <div class="time-picker-layout">
+            <div class="time-column">
+                <div class="time-column-label">Hours</div>
+                <button type="button" id="timeHourUpBtn" class="time-step-btn">▲</button>
+                <div id="timeHourDisplay" class="time-display">12</div>
+                <button type="button" id="timeHourDownBtn" class="time-step-btn">▼</button>
+            </div>
+
+            <div class="time-separator">:</div>
+
+            <div class="time-column">
+                <div class="time-column-label">Minutes</div>
+                <button type="button" id="timeMinuteUpBtn" class="time-step-btn">▲</button>
+                <div id="timeMinuteDisplay" class="time-display">00</div>
+                <button type="button" id="timeMinuteDownBtn" class="time-step-btn">▼</button>
+            </div>
+        </div>
+
+        <div id="timeAmPmToggle" class="ampm-toggle">
+            <button type="button" id="timeAmBtn" class="ampm-btn">AM</button>
+            <button type="button" id="timePmBtn" class="ampm-btn">PM</button>
+        </div>
+
+        <div id="timePreviewBox" class="time-preview-box">12:00 AM</div>
+
+        <div class="time-modal-footer">
+            <button type="button" id="timeClearBtn" class="small-btn">Clear</button>
+            <button type="button" id="timeCloseBtn" class="small-btn">Close</button>
+            <button type="button" id="timeApplyBtn" class="small-btn">Apply</button>
+        </div>
+    </div>
+</div>
+
+<div id="timeFormatModal" class="modal">
+    <div class="modal-content format-modal-content">
+        <div class="format-modal-header">
+            <div class="format-modal-title">Time Format</div>
+        </div>
+
+        <div class="format-option-list">
+            <button type="button" class="format-option-btn" data-format-value="12">AM / PM</button>
+            <button type="button" class="format-option-btn" data-format-value="24">24 Hours</button>
+        </div>
+
+        <div class="format-modal-footer">
+            <button type="button" id="formatCloseBtn" class="small-btn">Close</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/shipments.js?v=7"></script>
 </body>
 </html>

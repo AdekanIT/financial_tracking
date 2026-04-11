@@ -1,18 +1,1366 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Users</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users | Financial Tracking System</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=13">
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg-main: #0b1118;
+            --bg-soft: rgba(18, 24, 33, 0.94);
+            --bg-card: rgba(18, 24, 33, 0.92);
+            --bg-input: #0d131b;
+            --text-main: #e5eefb;
+            --text-soft: #8ea0b8;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-2: #2563eb;
+            --border-soft: rgba(147, 197, 253, 0.14);
+            --border-strong: rgba(120, 170, 255, 0.18);
+            --shadow-blue: 0 0 24px rgba(59, 130, 246, 0.10);
+        }
+
+        html, body {
+            min-height: 100%;
+            background:
+                radial-gradient(circle at top right, rgba(37, 99, 235, 0.10), transparent 28%),
+                radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 26%),
+                linear-gradient(180deg, #0b1118 0%, #0f1722 100%);
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+
+        body {
+            transition: background 0.25s ease;
+        }
+
+        .icon-svg {
+            width: 18px;
+            height: 18px;
+            display: inline-block;
+            vertical-align: middle;
+            color: #ffffff;
+            flex: 0 0 auto;
+        }
+
+        body.sidebar-collapsed .sidebar {
+            width: 88px;
+            min-width: 88px;
+            padding-left: 12px;
+            padding-right: 12px;
+        }
+
+        body.sidebar-collapsed .sidebar .logo-title,
+        body.sidebar-collapsed .sidebar .nav-link-text,
+        body.sidebar-collapsed .sidebar .logout-btn span:last-child {
+            display: none;
+        }
+
+        body.sidebar-collapsed .sidebar .nav-link {
+            justify-content: center;
+            padding: 14px 10px;
+        }
+
+        body.sidebar-collapsed .sidebar .logout-btn {
+            justify-content: center;
+            padding: 14px 10px;
+        }
+
+        body.sidebar-collapsed .sidebar .logo-wrap {
+            justify-content: center;
+        }
+
+        .sidebar-top {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .sidebar-toggle-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255, 255, 255, 0.04);
+            color: #dce7f5;
+            border-radius: 12px;
+            height: 38px;
+            width: 38px;
+            min-width: 38px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.18s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-toggle-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .toggle-icon {
+            position: absolute;
+            inset: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .toggle-icon-open {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .toggle-icon-close {
+            opacity: 0;
+            transform: scale(0.7) rotate(-90deg);
+        }
+
+        body.sidebar-collapsed .toggle-icon-open {
+            opacity: 0;
+            transform: scale(0.7) rotate(90deg);
+        }
+
+        body.sidebar-collapsed .toggle-icon-close {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-link-icon {
+            width: 18px;
+            min-width: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+
+        .logout-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .dashboard-main {
+            min-width: 0;
+            width: 100%;
+            background: transparent !important;
+        }
+
+        .users-page-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .users-page-top-right {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .small-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #dce7f5;
+            background: rgba(255, 255, 255, 0.03);
+            transition: 0.2s ease;
+        }
+
+        .small-btn:hover {
+            background: rgba(59, 130, 246, 0.10);
+            border-color: rgba(96, 165, 250, 0.34);
+        }
+
+        .primary-blue-btn {
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: white;
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+            transition: 0.2s ease;
+        }
+
+        .primary-blue-btn:hover {
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+            transform: translateY(-1px);
+        }
+
+        .danger-btn {
+            border: 1px solid rgba(239, 68, 68, 0.30);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #fee2e2;
+            background: rgba(127, 29, 29, 0.35);
+            transition: 0.2s ease;
+        }
+
+        .danger-btn:hover {
+            background: rgba(153, 27, 27, 0.48);
+        }
+
+        .compact-input,
+        .compact-select,
+        .users-form input,
+        .users-form select,
+        .users-form textarea {
+            padding: 9px 11px;
+            border-radius: 10px;
+            border: 1px solid rgba(147, 197, 253, 0.14);
+            background: #0d131b;
+            color: white;
+            font-size: 12px;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .compact-input:focus,
+        .compact-select:focus,
+        .users-form input:focus,
+        .users-form select:focus,
+        .users-form textarea:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
+        }
+
+        .control-card,
+        .summary-card,
+        .table-card,
+        .notes-card,
+        .logs-card {
+            background: rgba(18, 24, 33, 0.92);
+            border: 1px solid rgba(120, 170, 255, 0.18);
+            border-radius: 18px;
+            box-shadow: 0 0 24px rgba(59, 130, 246, 0.10);
+        }
+
+        .control-card {
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
+        .summary-card {
+            padding: 16px;
+        }
+
+        .users-control-header {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .animated-panel {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+            transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.18s ease;
+        }
+
+        .animated-panel.open {
+            max-height: 1600px;
+            opacity: 1;
+            margin-top: 14px;
+        }
+
+        .panel-inner {
+            border-top: 1px solid rgba(120, 170, 255, 0.14);
+            padding-top: 14px;
+        }
+
+        .panel-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 6px;
+        }
+
+        .panel-subtitle {
+            font-size: 12px;
+            color: #8ea0b8;
+            margin-bottom: 12px;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(170px, 220px));
+            gap: 10px;
+            justify-content: start;
+            align-items: end;
+        }
+
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            align-items: flex-start;
+        }
+
+        .filter-field label {
+            font-size: 12px;
+            color: #b8c4d6;
+            font-weight: 600;
+        }
+
+        .custom-trigger {
+            position: relative;
+            width: 100%;
+        }
+
+        .custom-trigger-input {
+            width: 100%;
+            padding-right: 42px !important;
+            cursor: pointer;
+        }
+
+        .custom-trigger-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #ffffff;
+            pointer-events: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .custom-trigger-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+        }
+
+        .users-actions-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 14px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .summary-label {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: #8ea0b8;
+            font-weight: 700;
+        }
+
+        .summary-value {
+            margin: 0;
+            font-size: 24px;
+            color: #f8fbff;
+            font-weight: 800;
+        }
+
+        .table-card,
+        .notes-card,
+        .logs-card {
+            padding: 16px;
+        }
+
+        .card-header {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .card-header h2 {
+            margin: 0 0 6px 0;
+            font-size: 18px;
+            color: #f8fbff;
+        }
+
+        .card-header p {
+            margin: 0;
+            color: #8ea0b8;
+            font-size: 12px;
+        }
+
+        .notes-card {
+            width: 280px;
+        }
+
+        .users-notes-header {
+            align-items: center;
+        }
+
+        .users-notes-title-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            flex: 1;
+        }
+
+        .users-notes-title {
+            margin: 0;
+            font-size: 17px;
+            line-height: 1.2;
+            color: #f8fbff;
+            font-weight: 700;
+        }
+
+        .notes-toggle-btn,
+        .panel-icon-btn {
+            min-width: 38px;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255,255,255,0.03);
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: 0.18s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .notes-toggle-btn:hover,
+        .panel-icon-btn:hover {
+            background: rgba(59, 130, 246, 0.10);
+            border-color: rgba(96, 165, 250, 0.30);
+        }
+
+        .notes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .notes-item {
+            color: #cbd5e1;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .table-toolbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255,255,255,0.03);
+            color: #dce7f5;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #60a5fa;
+            display: inline-block;
+        }
+
+        .users-table-wrap {
+            overflow: auto;
+            border-radius: 14px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(96,165,250,0.5) rgba(255,255,255,0.04);
+        }
+
+        .users-table-wrap::-webkit-scrollbar {
+            height: 10px;
+            width: 10px;
+        }
+
+        .users-table-wrap::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.04);
+            border-radius: 999px;
+        }
+
+        .users-table-wrap::-webkit-scrollbar-thumb {
+            background: rgba(96,165,250,0.55);
+            border-radius: 999px;
+        }
+
+        .users-table {
+            width: max-content;
+            min-width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed;
+        }
+
+        .users-table th,
+        .users-table td {
+            vertical-align: middle;
+            font-size: 12px;
+            padding: 10px 10px !important;
+            max-width: 210px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            background: rgba(18, 24, 33, 0.94);
+        }
+
+        .users-table th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: #111827;
+            color: #f8fbff;
+            text-align: left;
+        }
+
+        .empty-row {
+            text-align: center;
+            color: #94a3b8;
+            padding: 28px 16px !important;
+        }
+
+        .role-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(59, 130, 246, 0.14);
+            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.22);
+            text-transform: capitalize;
+        }
+
+        .active-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid transparent;
+        }
+
+        .active-pill.is-active {
+            background: rgba(34, 197, 94, 0.14);
+            color: #86efac;
+            border-color: rgba(34, 197, 94, 0.22);
+        }
+
+        .active-pill.is-inactive {
+            background: rgba(239, 68, 68, 0.14);
+            color: #fca5a5;
+            border-color: rgba(239, 68, 68, 0.22);
+        }
+
+        .action-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .action-small-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255, 255, 255, 0.03);
+            color: #dce7f5;
+            padding: 7px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+            transition: 0.2s ease;
+        }
+
+        .action-small-btn:hover {
+            background: rgba(59, 130, 246, 0.10);
+            border-color: rgba(96, 165, 250, 0.34);
+        }
+
+        .action-small-btn.danger {
+            color: #fecaca;
+            border-color: rgba(239, 68, 68, 0.24);
+            background: rgba(127, 29, 29, 0.18);
+        }
+
+        .action-small-btn.danger:hover {
+            background: rgba(127, 29, 29, 0.34);
+        }
+
+        .logs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .log-card {
+            border: 1px solid rgba(147, 197, 253, 0.14);
+            background: rgba(255,255,255,0.03);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .log-card-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
+
+        .log-user {
+            font-size: 13px;
+            font-weight: 700;
+            color: #dce7f5;
+        }
+
+        .log-date {
+            font-size: 12px;
+            color: #93a4bb;
+        }
+
+        .log-field {
+            font-size: 12px;
+            color: #93c5fd;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .log-values {
+            font-size: 12px;
+            color: #cbd5e1;
+            display: grid;
+            gap: 6px;
+        }
+
+        .log-value-box {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(147, 197, 253, 0.10);
+            border-radius: 10px;
+            padding: 8px 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .preview-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .preview-user-card {
+            border: 1px solid rgba(147, 197, 253, 0.14);
+            background: rgba(255,255,255,0.03);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .preview-user-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #e5eefb;
+            margin-bottom: 6px;
+        }
+
+        .preview-user-meta {
+            font-size: 12px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .field-error {
+            border-color: rgba(248, 113, 113, 0.55) !important;
+            box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.08) !important;
+        }
+
+        .modal {
+            cursor: pointer;
+        }
+
+        .modal-content {
+            cursor: default;
+            background: rgba(15, 23, 34, 0.98);
+            max-width: 760px !important;
+            width: 96% !important;
+        }
+
+        .modal-subtitle {
+            color: #8ea0b8;
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .users-modal-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .users-modal-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .users-modal-field.full-row {
+            grid-column: 1 / -1;
+        }
+
+        .users-modal-field label {
+            font-size: 12px;
+            color: #b8c4d6;
+            font-weight: 600;
+        }
+
+        .users-modal-field input,
+        .users-modal-field select,
+        .users-modal-field textarea {
+            padding: 11px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(147, 197, 253, 0.14);
+            background: #0d131b;
+            color: white;
+            font-size: 13px;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .users-modal-field input:focus,
+        .users-modal-field select:focus,
+        .users-modal-field textarea:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .modal-actions-left,
+        .modal-actions-right {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .select-modal-content,
+        .confirm-modal-content {
+            max-width: 360px !important;
+            width: 94% !important;
+            padding: 18px;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .select-modal-header,
+        .confirm-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .select-modal-title,
+        .confirm-modal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .select-option-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .select-option-btn {
+            min-height: 44px;
+            border-radius: 12px;
+            border: 1px solid rgba(147, 197, 253, 0.16);
+            background: rgba(255,255,255,0.03);
+            color: #dbe7f5;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            transition: 0.15s ease;
+            text-align: left;
+            padding: 0 14px;
+        }
+
+        .select-option-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.24);
+        }
+
+        .confirm-text {
+            color: #cbd5e1;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 14px;
+        }
+
+        @media (max-width: 1300px) {
+            .filter-grid {
+                grid-template-columns: repeat(3, minmax(160px, 220px));
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(180px, 1fr));
+            }
+
+            .users-page-top {
+                flex-direction: column;
+            }
+
+            .notes-card {
+                width: 100%;
+            }
+
+            .users-modal-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .filter-grid,
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
-<body>
+<body class="dashboard-body">
 
-<h1>Users</h1>
+<svg width="0" height="0" style="position:absolute;visibility:hidden">
+    <symbol id="icon-dashboard" viewBox="0 0 24 24">
+        <path d="M4 18L9 12L13 15L20 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M18 7H20V9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
 
-<table>
-    <tbody id="usersTable"></tbody>
-</table>
+    <symbol id="icon-box" viewBox="0 0 24 24">
+        <path d="M12 3L20 7V17L12 21L4 17V7L12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M4 7L12 11L20 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M12 11V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-dollar" viewBox="0 0 24 24">
+        <path d="M12 3V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M16.5 7.5C16.5 5.8 14.5 4.5 12 4.5C9.5 4.5 7.5 5.8 7.5 7.8C7.5 9.6 9 10.4 12 11C15 11.6 16.5 12.4 16.5 14.5C16.5 16.5 14.6 18 12 18C9.4 18 7.5 16.7 7.5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-user" viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M5 20C6.8 16.8 9 15.5 12 15.5C15 15.5 17.2 16.8 19 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-logout" viewBox="0 0 24 24">
+        <path d="M15 16L20 12L15 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 12H9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M12 4H6C4.9 4 4 4.9 4 6V18C4 19.1 4.9 20 6 20H12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-menu-open" viewBox="0 0 24 24">
+        <path d="M4 7H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M4 12H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M4 17H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-menu-close" viewBox="0 0 24 24">
+        <path d="M9 6L15 12L9 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <symbol id="icon-refresh" viewBox="0 0 24 24">
+        <path d="M20 11A8 8 0 0 0 6.3 5.3L4 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 4V8H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 13A8 8 0 0 0 17.7 18.7L20 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M16 16H20V20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <symbol id="icon-chevron-down" viewBox="0 0 24 24">
+        <path d="M6 9L12 15L18 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </symbol>
+
+    <symbol id="icon-minus" viewBox="0 0 24 24">
+        <path d="M5 12H19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+    </symbol>
+
+    <symbol id="icon-archive" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="4" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M5 9H19V19H5Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M9 13H15" stroke="currentColor" stroke-width="1.8"/>
+    </symbol>
+</svg>
+
+<aside class="sidebar">
+    <div class="sidebar-top">
+        <div class="logo-wrap">
+            <h2 class="logo-title">FTMS</h2>
+            <button id="toggleSidebarBtn" class="sidebar-toggle-btn" type="button" title="Toggle Sidebar" aria-label="Toggle Sidebar">
+                <span class="toggle-icon toggle-icon-open">
+                    <svg class="icon-svg"><use href="#icon-menu-open"></use></svg>
+                </span>
+                <span class="toggle-icon toggle-icon-close">
+                    <svg class="icon-svg"><use href="#icon-menu-close"></use></svg>
+                </span>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="/dashboard" class="nav-link">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-dashboard"></use></svg>
+                </span>
+                <span class="nav-link-text">Dashboard</span>
+            </a>
+
+            <a href="/shipments" class="nav-link">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-box"></use></svg>
+                </span>
+                <span class="nav-link-text">Shipments</span>
+            </a>
+
+            <a href="/salary" class="nav-link">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-dollar"></use></svg>
+                </span>
+                <span class="nav-link-text">Salary</span>
+            </a>
+
+            <a href="/users" class="nav-link active">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-user"></use></svg>
+                </span>
+                <span class="nav-link-text">Users</span>
+            </a>
+
+            <a href="/archive" class="nav-link">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-archive"></use></svg>
+                </span>
+                <span class="nav-link-text">Archive</span>
+            </a>
+        </nav>
+    </div>
+
+    <button id="logoutBtn" class="logout-btn">
+        <span class="nav-link-icon">
+            <svg class="icon-svg"><use href="#icon-logout"></use></svg>
+        </span>
+        <span>Logout</span>
+    </button>
+</aside>
+
+<main class="dashboard-main">
+    <div class="users-page-top">
+        <div>
+            <h1 class="page-title" id="usersPageTitle">User Management</h1>
+            <p class="page-subtitle" id="usersPageSubtitle">
+                Create staff accounts, manage access, and review user activity logs
+            </p>
+        </div>
+
+        <div class="users-page-top-right">
+            <div class="notes-card">
+                <div class="card-header users-notes-header" style="margin-bottom:0;">
+                    <div class="users-notes-title-wrap">
+                        <h2 class="users-notes-title">Users Notes</h2>
+                    </div>
+                    <button id="toggleNotesBtn" class="notes-toggle-btn" type="button" title="Toggle Users Notes">☰</button>
+                </div>
+
+                <div id="usersNotesPanel" class="animated-panel">
+                    <div class="notes-list">
+                        <div class="notes-item">Managers and HR can create new user accounts.</div>
+                        <div class="notes-item">Only manager should change user active or inactive status.</div>
+                        <div class="notes-item">Password updates should be tracked in user logs.</div>
+                        <div class="notes-item">Use filters to quickly find staff by username, full name, role, or status.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <p class="summary-label">Total Users</p>
+            <p class="summary-value" id="summaryTotalUsers">0</p>
+        </div>
+
+        <div class="summary-card">
+            <p class="summary-label">Active Users</p>
+            <p class="summary-value" id="summaryActiveUsers">0</p>
+        </div>
+
+        <div class="summary-card">
+            <p class="summary-label">Inactive Users</p>
+            <p class="summary-value" id="summaryInactiveUsers">0</p>
+        </div>
+
+        <div class="summary-card">
+            <p class="summary-label">Managers / HR</p>
+            <p class="summary-value" id="summaryPrivilegedUsers">0</p>
+        </div>
+    </div>
+
+    <div id="usersFilterCard" class="control-card">
+        <div class="users-control-header">
+            <button id="openCreateUserBtn" class="primary-blue-btn" type="button">Create User</button>
+            <button id="refreshUsersBtn" class="small-btn" type="button">Refresh</button>
+            <button id="openPasswordModalBtn" class="small-btn" type="button">Change Password</button>
+            <button id="toggleFiltersBtn" class="small-btn" type="button">Users Filters</button>
+            <button id="previewUsersBtn" class="primary-blue-btn" type="button">Preview Users</button>
+        </div>
+
+        <div id="usersFiltersPanel" class="animated-panel open">
+            <div class="panel-inner">
+                <div class="panel-title">User Search and Filters</div>
+                <div class="panel-subtitle">Search current staff records and filter by role or active status</div>
+
+                <div class="filter-grid">
+                    <div class="filter-field">
+                        <label for="userSearchInput">Search</label>
+                        <input
+                            type="text"
+                            id="userSearchInput"
+                            class="compact-input"
+                            placeholder="Username or full name"
+                        >
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="jobTitleFilterDisplay">Job Title</label>
+                        <div class="custom-trigger">
+                            <input
+                                id="jobTitleFilterDisplay"
+                                class="compact-input custom-trigger-input"
+                                type="text"
+                                placeholder="Select role"
+                                readonly
+                            >
+                            <input type="hidden" id="jobTitleFilter" value="">
+                            <span class="custom-trigger-icon">
+                                <svg><use href="#icon-chevron-down"></use></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="statusFilterDisplay">Status</label>
+                        <div class="custom-trigger">
+                            <input
+                                id="statusFilterDisplay"
+                                class="compact-input custom-trigger-input"
+                                type="text"
+                                placeholder="Select status"
+                                readonly
+                            >
+                            <input type="hidden" id="statusFilter" value="">
+                            <span class="custom-trigger-icon">
+                                <svg><use href="#icon-chevron-down"></use></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="logsUserFilter">Logs User ID</label>
+                        <input
+                            type="number"
+                            id="logsUserFilter"
+                            class="compact-input"
+                            placeholder="Optional log lookup"
+                        >
+                    </div>
+                </div>
+
+                <div class="users-actions-row">
+                    <button id="runUserFiltersBtn" class="primary-blue-btn" type="button">Apply Filters</button>
+                    <button id="resetUserFiltersBtn" class="small-btn" type="button">Reset</button>
+                    <button id="loadUserLogsBtn" class="small-btn" type="button">Load User Logs</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <div class="table-toolbar">
+            <div class="card-header" style="margin-bottom:0;">
+                <div>
+                    <h2 id="usersTableTitle">Staff Records</h2>
+                    <p id="usersTableSubtitle">Current users in the system with role and status controls</p>
+                </div>
+            </div>
+
+            <div class="toolbar-actions">
+                <div class="status-chip">
+                    <span class="status-dot"></span>
+                    <span id="usersStatusText">Ready</span>
+                </div>
+                <button id="collapseUsersTableBtn" class="panel-icon-btn" type="button" title="Collapse Staff Records">
+                    <svg class="icon-svg"><use href="#icon-minus"></use></svg>
+                </button>
+            </div>
+        </div>
+
+        <p id="usersResultInfo" style="color:#8ea0b8; font-size:12px; margin-bottom:12px;">
+            No data loaded yet
+        </p>
+
+        <div id="usersTablePanel" class="animated-panel open">
+            <div class="users-table-wrap">
+                <table class="users-table">
+                    <thead>
+                        <tr>
+                            <th>Staff ID</th>
+                            <th>Username</th>
+                            <th>Full Name</th>
+                            <th>Job Title</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr>
+                            <td colspan="7" class="empty-row">Load users to see results.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="usersPreviewCard" class="table-card hidden" style="margin-top:16px;">
+        <div class="card-header">
+            <div>
+                <h2>Users Preview</h2>
+                <p>Filtered preview before actions</p>
+            </div>
+        </div>
+
+        <div id="usersPreviewContent" class="preview-list" style="color:#cbd5e1; font-size:13px;">
+            No preview yet
+        </div>
+    </div>
+
+    <div id="userLogsCard" class="logs-card" style="margin-top:16px;">
+        <div class="table-toolbar">
+            <div class="card-header" style="margin-bottom:0;">
+                <div>
+                    <h2>User Logs</h2>
+                    <p>Recent user management activity and security-related changes</p>
+                </div>
+            </div>
+
+            <div class="toolbar-actions">
+                <button id="refreshLogsBtn" class="panel-icon-btn" type="button" title="Refresh Logs">
+                    <svg class="icon-svg"><use href="#icon-refresh"></use></svg>
+                </button>
+                <button id="collapseLogsBtn" class="panel-icon-btn" type="button" title="Collapse Logs">
+                    <svg class="icon-svg"><use href="#icon-minus"></use></svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="userLogsPanel" class="animated-panel open">
+            <div id="userLogsList" class="logs-list">
+                <div class="empty-row">No logs loaded yet.</div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<div id="createUserModal" class="modal hidden" style="display:none;">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h2>Create User</h2>
+        <p class="modal-subtitle">Create a new staff account with role-based access.</p>
+
+        <form id="createUserForm" class="users-form">
+            <div class="users-modal-grid">
+                <div class="users-modal-field">
+                    <label for="createUsername">Username</label>
+                    <input type="text" id="createUsername" placeholder="Enter username">
+                </div>
+
+                <div class="users-modal-field">
+                    <label for="createFullName">Full Name</label>
+                    <input type="text" id="createFullName" placeholder="Enter full name">
+                </div>
+
+                <div class="users-modal-field">
+                    <label for="createJobTitleDisplay">Job Title</label>
+                    <div class="custom-trigger">
+                        <input
+                            id="createJobTitleDisplay"
+                            class="custom-trigger-input"
+                            type="text"
+                            placeholder="Select role"
+                            readonly
+                        >
+                        <input type="hidden" id="createJobTitle" value="">
+                        <span class="custom-trigger-icon">
+                            <svg><use href="#icon-chevron-down"></use></svg>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="users-modal-field">
+                    <label for="createPassword">Password</label>
+                    <input type="password" id="createPassword" placeholder="Enter password">
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <div class="modal-actions-left">
+                    <button id="closeCreateUserModalBtn" class="small-btn" type="button">Close</button>
+                </div>
+                <div class="modal-actions-right">
+                    <button id="submitCreateUserBtn" class="primary-blue-btn" type="submit">Create User</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="changePasswordModal" class="modal hidden" style="display:none;">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h2>Change Password</h2>
+        <p class="modal-subtitle">Update password for an existing staff account.</p>
+
+        <form id="changePasswordForm" class="users-form">
+            <div class="users-modal-grid">
+                <div class="users-modal-field">
+                    <label for="passwordStaffId">Staff ID</label>
+                    <input type="number" id="passwordStaffId" placeholder="Enter staff ID">
+                </div>
+
+                <div class="users-modal-field">
+                    <label for="newPassword">New Password</label>
+                    <input type="password" id="newPassword" placeholder="Enter new password">
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <div class="modal-actions-left">
+                    <button id="closePasswordModalBtn" class="small-btn" type="button">Close</button>
+                </div>
+                <div class="modal-actions-right">
+                    <button id="submitPasswordChangeBtn" class="primary-blue-btn" type="submit">Update Password</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="usersSelectModal" class="modal hidden" style="display:none;">
+    <div class="modal-content select-modal-content" onclick="event.stopPropagation()">
+        <div class="select-modal-header">
+            <div class="select-modal-title" id="usersSelectModalTitle">Select Option</div>
+            <button id="usersSelectCloseBtn" class="panel-icon-btn" type="button">✕</button>
+        </div>
+
+        <div id="usersSelectOptionList" class="select-option-list"></div>
+    </div>
+</div>
+
+<div id="confirmStatusModal" class="modal hidden" style="display:none;">
+    <div class="modal-content confirm-modal-content" onclick="event.stopPropagation()">
+        <div class="confirm-modal-header">
+            <div class="confirm-modal-title">Confirm Status Change</div>
+            <button id="closeConfirmStatusModalBtn" class="panel-icon-btn" type="button">✕</button>
+        </div>
+
+        <div id="confirmStatusText" class="confirm-text">
+            Are you sure you want to continue?
+        </div>
+
+        <div class="modal-actions">
+            <div class="modal-actions-left">
+                <button id="cancelConfirmStatusBtn" class="small-btn" type="button">Cancel</button>
+            </div>
+            <div class="modal-actions-right">
+                <button id="confirmStatusActionBtn" class="danger-btn" type="button">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="/static/js/api.js"></script>
-<script src="/static/js/users.js"></script>
+<script src="/static/js/users.js?v=13"></script>
 </body>
 </html>

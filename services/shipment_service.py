@@ -291,8 +291,6 @@ def create_shipment(data, staff_id):
 
 # =======================================================
 # GET VISIBLE LIST
-# Everyone can see all shipments,
-# but financial fields are filtered by role/ownership
 # =======================================================
 def get_visible_shipments_service(current_user):
     conn = get_connection()
@@ -309,7 +307,6 @@ def get_visible_shipments_service(current_user):
 
 # =======================================================
 # LEGACY GET MY
-# Kept for compatibility, but now returns visible shipments
 # =======================================================
 def get_my_shipments_service(current_user):
     return get_visible_shipments_service(current_user)
@@ -317,7 +314,6 @@ def get_my_shipments_service(current_user):
 
 # =======================================================
 # LEGACY GET ALL
-# Kept for compatibility, but now returns visible shipments
 # =======================================================
 def get_all_shipments_service(current_user):
     return get_visible_shipments_service(current_user)
@@ -325,8 +321,6 @@ def get_all_shipments_service(current_user):
 
 # =======================================================
 # GET ONE
-# Everyone can open a shipment,
-# but financial fields are filtered by role/ownership
 # =======================================================
 def get_shipment_by_id(shipment_id, current_user):
     conn = get_connection()
@@ -352,9 +346,70 @@ def get_shipment_by_id(shipment_id, current_user):
 
 
 # =======================================================
+# GET LOGS
+# =======================================================
+def get_shipment_logs_service(shipment_id: int, current_user: dict):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT shipment_id, assigned_staff_id, is_deleted
+            FROM shipments
+            WHERE shipment_id = %s
+            LIMIT 1
+        """, (shipment_id,))
+        shipment = cursor.fetchone()
+
+        if not shipment or int(shipment.get("is_deleted", 0)) == 1:
+            raise HTTPException(status_code=404, detail="Shipment not found")
+
+        if normalize_job_title(current_user.get("job_title")) == "dispatcher":
+            if shipment["assigned_staff_id"] != current_user["staff_id"]:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+        cursor.execute("""
+            SELECT
+                sl.shipment_log_id,
+                sl.shipment_id,
+                sl.staff_id,
+                sl.field_name,
+                sl.old_value,
+                sl.new_value,
+                sl.note,
+                sl.updated_at,
+                s.staff_full_name AS changed_by_name
+            FROM shipment_logs sl
+            LEFT JOIN staff s
+                ON sl.staff_id = s.staff_id
+            WHERE sl.shipment_id = %s
+            ORDER BY sl.updated_at DESC, sl.shipment_log_id DESC
+        """, (shipment_id,))
+
+        logs = cursor.fetchall()
+
+        normalized_logs = []
+        for log in logs:
+            normalized_logs.append({
+                "log_id": log.get("shipment_log_id"),
+                "shipment_id": log.get("shipment_id"),
+                "staff_id": log.get("staff_id"),
+                "changed_by_name": log.get("changed_by_name"),
+                "field_name": log.get("field_name") or log.get("note") or "Change",
+                "old_value": log.get("old_value"),
+                "new_value": log.get("new_value"),
+                "note": log.get("note"),
+                "created_at": log.get("updated_at")
+            })
+
+        return normalized_logs
+
+    finally:
+        cursor.close()
+        conn.close()
+
+# =======================================================
 # UPDATE
-# Dispatcher can update only own shipments
-# Others by existing permission rules from router
 # =======================================================
 def update_shipment_service(shipment_id, data, current_user):
     conn = get_connection()

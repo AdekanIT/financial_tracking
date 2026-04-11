@@ -1,21 +1,1308 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Salary</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salary | Financial Tracking System</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg-main: #0b1118;
+            --bg-soft: rgba(18, 24, 33, 0.94);
+            --bg-card: rgba(18, 24, 33, 0.92);
+            --bg-input: #0d131b;
+            --text-main: #e5eefb;
+            --text-soft: #8ea0b8;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-2: #2563eb;
+            --border-soft: rgba(147, 197, 253, 0.14);
+            --border-strong: rgba(120, 170, 255, 0.18);
+            --shadow-blue: 0 0 24px rgba(59, 130, 246, 0.10);
+        }
+
+        html, body {
+            min-height: 100%;
+            background:
+                radial-gradient(circle at top right, rgba(37, 99, 235, 0.10), transparent 28%),
+                radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 26%),
+                linear-gradient(180deg, #0b1118 0%, #0f1722 100%);
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+
+        body {
+            transition: background 0.25s ease;
+        }
+
+        .icon-svg {
+            width: 18px;
+            height: 18px;
+            display: inline-block;
+            vertical-align: middle;
+            color: #ffffff;
+            flex: 0 0 auto;
+        }
+
+        body.sidebar-collapsed .sidebar {
+            width: 88px;
+            min-width: 88px;
+            padding-left: 12px;
+            padding-right: 12px;
+        }
+
+        body.sidebar-collapsed .sidebar .logo-title,
+        body.sidebar-collapsed .sidebar .nav-link-text,
+        body.sidebar-collapsed .sidebar .logout-btn span:last-child {
+            display: none;
+        }
+
+        body.sidebar-collapsed .sidebar .nav-link {
+            justify-content: center;
+            padding: 14px 10px;
+        }
+
+        body.sidebar-collapsed .sidebar .logout-btn {
+            justify-content: center;
+            padding: 14px 10px;
+        }
+
+        body.sidebar-collapsed .sidebar .logo-wrap {
+            justify-content: center;
+        }
+
+        .sidebar-top {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .sidebar-toggle-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255, 255, 255, 0.04);
+            color: #dce7f5;
+            border-radius: 12px;
+            height: 38px;
+            width: 38px;
+            min-width: 38px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.18s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-toggle-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .toggle-icon {
+            position: absolute;
+            inset: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .toggle-icon-open {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .toggle-icon-close {
+            opacity: 0;
+            transform: scale(0.7) rotate(-90deg);
+        }
+
+        body.sidebar-collapsed .toggle-icon-open {
+            opacity: 0;
+            transform: scale(0.7) rotate(90deg);
+        }
+
+        body.sidebar-collapsed .toggle-icon-close {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-link-icon {
+            width: 18px;
+            min-width: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+
+        .logout-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .dashboard-main {
+            min-width: 0;
+            width: 100%;
+            background: transparent !important;
+        }
+
+        .salary-page-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .salary-page-top-right {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .small-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #dce7f5;
+            background: rgba(255, 255, 255, 0.03);
+            transition: 0.2s ease;
+        }
+
+        .small-btn:hover {
+            background: rgba(59, 130, 246, 0.10);
+            border-color: rgba(96, 165, 250, 0.34);
+        }
+
+        .primary-blue-btn {
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: white;
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+            transition: 0.2s ease;
+        }
+
+        .primary-blue-btn:hover {
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+            transform: translateY(-1px);
+        }
+
+        .danger-btn {
+            border: 1px solid rgba(239, 68, 68, 0.30);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #fee2e2;
+            background: rgba(127, 29, 29, 0.35);
+            transition: 0.2s ease;
+        }
+
+        .danger-btn:hover {
+            background: rgba(153, 27, 27, 0.48);
+        }
+
+        .compact-input,
+        .compact-select,
+        .salary-form input,
+        .salary-form select,
+        .salary-form textarea {
+            padding: 9px 11px;
+            border-radius: 10px;
+            border: 1px solid rgba(147, 197, 253, 0.14);
+            background: #0d131b;
+            color: white;
+            font-size: 12px;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .compact-input:focus,
+        .compact-select:focus,
+        .salary-form input:focus,
+        .salary-form select:focus,
+        .salary-form textarea:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
+        }
+
+        .control-card,
+        .summary-card,
+        .table-card,
+        .notes-card {
+            background: rgba(18, 24, 33, 0.92);
+            border: 1px solid rgba(120, 170, 255, 0.18);
+            border-radius: 18px;
+            box-shadow: 0 0 24px rgba(59, 130, 246, 0.10);
+        }
+
+        .control-card {
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
+        .summary-card {
+            padding: 16px;
+        }
+
+        .salary-control-header {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .animated-panel {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+            transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.18s ease;
+        }
+
+        .animated-panel.open {
+            max-height: 1600px;
+            opacity: 1;
+            margin-top: 14px;
+        }
+
+        .panel-inner {
+            border-top: 1px solid rgba(120, 170, 255, 0.14);
+            padding-top: 14px;
+        }
+
+        .panel-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 6px;
+        }
+
+        .panel-subtitle {
+            font-size: 12px;
+            color: #8ea0b8;
+            margin-bottom: 12px;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(145px, 190px));
+            gap: 10px;
+            justify-content: start;
+            align-items: end;
+        }
+
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            align-items: flex-start;
+        }
+
+        .filter-field label {
+            font-size: 12px;
+            color: #b8c4d6;
+            font-weight: 600;
+        }
+
+        .salary-form-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(145px, 1fr));
+            gap: 10px;
+            align-items: end;
+            margin-top: 14px;
+        }
+
+        .salary-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .salary-field label {
+            font-size: 12px;
+            color: #b8c4d6;
+            font-weight: 600;
+        }
+
+        .salary-actions-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 14px;
+        }
+
+        .input-with-picker {
+            position: relative;
+            width: 100%;
+        }
+
+        .input-with-picker input {
+            padding-right: 44px;
+        }
+
+        .picker-launch-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: transparent;
+            color: #ffffff;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            cursor: pointer;
+            opacity: 0.96;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .picker-launch-btn:hover {
+            opacity: 1;
+        }
+
+        .picker-launch-btn svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+        }
+
+        .custom-trigger {
+            position: relative;
+            width: 100%;
+        }
+
+        .custom-trigger-input {
+            width: 100%;
+            padding-right: 42px !important;
+            cursor: pointer;
+        }
+
+        .custom-trigger-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #ffffff;
+            pointer-events: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .custom-trigger-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .summary-label {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: #8ea0b8;
+            font-weight: 700;
+        }
+
+        .summary-value {
+            margin: 0;
+            font-size: 24px;
+            color: #f8fbff;
+            font-weight: 800;
+        }
+
+        .table-card,
+        .notes-card {
+            padding: 16px;
+        }
+
+        .card-header {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .card-header h2 {
+            margin: 0 0 6px 0;
+            font-size: 18px;
+            color: #f8fbff;
+        }
+
+        .card-header p {
+            margin: 0;
+            color: #8ea0b8;
+            font-size: 12px;
+        }
+
+        .notes-card {
+            width: 260px;
+        }
+
+        .salary-notes-header {
+            align-items: center;
+        }
+
+        .salary-notes-title-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            flex: 1;
+        }
+
+        .salary-notes-title {
+            margin: 0;
+            font-size: 17px;
+            line-height: 1.2;
+            color: #f8fbff;
+            font-weight: 700;
+        }
+
+        .notes-toggle-btn {
+            min-width: 38px;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255,255,255,0.03);
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: 0.18s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .notes-toggle-btn:hover {
+            background: rgba(59, 130, 246, 0.10);
+            border-color: rgba(96, 165, 250, 0.30);
+        }
+
+        .notes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .notes-item {
+            color: #cbd5e1;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .table-toolbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255,255,255,0.03);
+            color: #dce7f5;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #60a5fa;
+            display: inline-block;
+        }
+
+        .salary-table-wrap {
+            overflow: auto;
+            border-radius: 14px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(96,165,250,0.5) rgba(255,255,255,0.04);
+        }
+
+        .salary-table-wrap::-webkit-scrollbar {
+            height: 10px;
+            width: 10px;
+        }
+
+        .salary-table-wrap::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.04);
+            border-radius: 999px;
+        }
+
+        .salary-table-wrap::-webkit-scrollbar-thumb {
+            background: rgba(96,165,250,0.55);
+            border-radius: 999px;
+        }
+
+        .salary-table {
+            width: max-content;
+            min-width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed;
+        }
+
+        .salary-table th,
+        .salary-table td {
+            vertical-align: middle;
+            font-size: 12px;
+            padding: 10px 10px !important;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            background: rgba(18, 24, 33, 0.94);
+        }
+
+        .salary-table th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: #111827;
+            color: #f8fbff;
+            text-align: left;
+        }
+
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            transition: 0.16s ease;
+        }
+
+        .sortable-header:hover {
+            color: #93c5fd;
+        }
+
+        .header-sort-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sort-indicator {
+            font-size: 10px;
+            color: #7c93b4;
+        }
+
+        .empty-row {
+            text-align: center;
+            color: #94a3b8;
+            padding: 28px 16px !important;
+        }
+
+        .money-positive {
+            color: #86efac;
+            font-weight: 700;
+        }
+
+        .money-neutral {
+            color: #dbe7f5;
+            font-weight: 700;
+        }
+
+        .role-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(59, 130, 246, 0.14);
+            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.22);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .field-error {
+            border-color: rgba(248, 113, 113, 0.55) !important;
+            box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.08) !important;
+        }
+
+        .date-modal-content,
+        .select-modal-content {
+            max-width: 360px !important;
+            width: 94% !important;
+            padding: 18px;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .date-modal-header,
+        .select-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .date-modal-title,
+        .select-modal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .date-modal-nav {
+            display: flex;
+            gap: 8px;
+        }
+
+        .date-nav-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255,255,255,0.03);
+            color: #e2e8f0;
+            cursor: pointer;
+        }
+
+        .date-nav-btn:hover {
+            background: rgba(59, 130, 246, 0.10);
+        }
+
+        .date-weekdays,
+        .date-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .date-weekdays {
+            margin-bottom: 8px;
+        }
+
+        .date-weekday {
+            text-align: center;
+            font-size: 11px;
+            color: #8ea0b8;
+            padding: 4px 0;
+            font-weight: 700;
+        }
+
+        .date-day-btn {
+            height: 40px;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            background: rgba(255,255,255,0.03);
+            color: #e2e8f0;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: 0.15s ease;
+        }
+
+        .date-day-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.22);
+        }
+
+        .date-day-btn.muted {
+            color: #64748b;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .date-day-btn.active {
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+            color: white;
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .date-modal-footer,
+        .select-modal-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .select-option-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .select-option-btn {
+            min-height: 44px;
+            border-radius: 12px;
+            border: 1px solid rgba(147, 197, 253, 0.16);
+            background: rgba(255,255,255,0.03);
+            color: #dbe7f5;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            transition: 0.15s ease;
+            text-align: left;
+            padding: 0 14px;
+        }
+
+        .select-option-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.24);
+        }
+
+        .modal {
+            cursor: pointer;
+        }
+
+        .modal-content {
+            cursor: default;
+            background: rgba(15, 23, 34, 0.98);
+        }
+
+        @media (max-width: 1300px) {
+            .filter-grid {
+                grid-template-columns: repeat(3, minmax(145px, 190px));
+            }
+
+            .salary-form-grid {
+                grid-template-columns: repeat(3, minmax(145px, 1fr));
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(180px, 1fr));
+            }
+
+            .salary-page-top {
+                flex-direction: column;
+            }
+
+            .notes-card {
+                width: 100%;
+            }
+
+            .salary-form-grid {
+                grid-template-columns: repeat(2, minmax(145px, 1fr));
+            }
+        }
+
+        @media (max-width: 700px) {
+            .filter-grid,
+            .salary-form-grid,
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
-<body>
+<body class="dashboard-body">
 
-<h1>Salary</h1>
+<svg width="0" height="0" style="position:absolute;visibility:hidden">
+    <symbol id="icon-calendar" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="16" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
 
-<button onclick="generateSalary()">Generate Salary</button>
+    <symbol id="icon-dashboard" viewBox="0 0 24 24">
+        <path d="M4 18L9 12L13 15L20 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M18 7H20V9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
 
-<table>
-    <tbody id="salaryTable"></tbody>
-</table>
+    <symbol id="icon-box" viewBox="0 0 24 24">
+        <path d="M12 3L20 7V17L12 21L4 17V7L12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M4 7L12 11L20 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M12 11V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
 
-<script src="/static/js/api.js"></script>
-<script src="/static/js/auth.js"></script>
-<script src="/static/js/salary.js"></script>
+    <symbol id="icon-dollar" viewBox="0 0 24 24">
+        <path d="M12 3V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M16.5 7.5C16.5 5.8 14.5 4.5 12 4.5C9.5 4.5 7.5 5.8 7.5 7.8C7.5 9.6 9 10.4 12 11C15 11.6 16.5 12.4 16.5 14.5C16.5 16.5 14.6 18 12 18C9.4 18 7.5 16.7 7.5 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-user" viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M5 20C6.8 16.8 9 15.5 12 15.5C15 15.5 17.2 16.8 19 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-logout" viewBox="0 0 24 24">
+        <path d="M15 16L20 12L15 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 12H9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M12 4H6C4.9 4 4 4.9 4 6V18C4 19.1 4.9 20 6 20H12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-menu-open" viewBox="0 0 24 24">
+        <path d="M4 7H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M4 12H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M4 17H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-menu-close" viewBox="0 0 24 24">
+        <path d="M9 6L15 12L9 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <symbol id="icon-chevron-down" viewBox="0 0 24 24">
+        <path d="M6 9L12 15L18 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </symbol>
+
+    <symbol id="icon-archive" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="4" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M5 9H19V19H5Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M9 13H15" stroke="currentColor" stroke-width="1.8"/>
+    </symbol>
+</svg>
+
+<aside class="sidebar">
+    <div class="sidebar-top">
+        <div class="logo-wrap">
+            <h2 class="logo-title">FTMS</h2>
+            <button id="toggleSidebarBtn" class="sidebar-toggle-btn" type="button" title="Toggle Sidebar" aria-label="Toggle Sidebar">
+                <span class="toggle-icon toggle-icon-open">
+                    <svg class="icon-svg"><use href="#icon-menu-open"></use></svg>
+                </span>
+                <span class="toggle-icon toggle-icon-close">
+                    <svg class="icon-svg"><use href="#icon-menu-close"></use></svg>
+                </span>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="/dashboard" class="nav-link">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-dashboard"></use></svg>
+                </span>
+                <span class="nav-link-text">Dashboard</span>
+            </a>
+
+            <a href="/shipments" class="nav-link">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-box"></use></svg>
+                </span>
+                <span class="nav-link-text">Shipments</span>
+            </a>
+
+            <a href="/salary" class="nav-link active">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-dollar"></use></svg>
+                </span>
+                <span class="nav-link-text">Salary</span>
+            </a>
+
+            <a href="/users" class="nav-link">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-user"></use></svg>
+                </span>
+                <span class="nav-link-text">Users</span>
+            </a>
+
+            <a href="/archive" class="nav-link">
+                <span class="nav-link-icon">
+                    <svg class="icon-svg"><use href="#icon-archive"></use></svg>
+                </span>
+                <span class="nav-link-text">Archive</span>
+            </a>
+        </nav>
+    </div>
+
+    <button id="logoutBtn" class="logout-btn">
+        <span class="nav-link-icon">
+            <svg class="icon-svg"><use href="#icon-logout"></use></svg>
+        </span>
+        <span>Logout</span>
+    </button>
+</aside>
+
+<main class="dashboard-main">
+    <div class="salary-page-top">
+        <div>
+            <h1 class="page-title" id="salaryPageTitle">Salary Management</h1>
+            <p class="page-subtitle" id="salaryPageSubtitle">
+                Check salary results by period and generate official salary records
+            </p>
+        </div>
+
+        <div class="salary-page-top-right">
+            <div class="notes-card">
+                <div class="card-header salary-notes-header" style="margin-bottom:0;">
+                    <div class="salary-notes-title-wrap">
+                        <h2 class="salary-notes-title">Salary Notes</h2>
+                    </div>
+                    <button id="toggleNotesBtn" class="notes-toggle-btn" type="button" title="Toggle Salary Notes">☰</button>
+                </div>
+
+                <div id="salaryNotesPanel" class="animated-panel">
+                    <div class="notes-list">
+                        <div class="notes-item">Salary Check is for preview only and does not generate records.</div>
+                        <div class="notes-item">Generate Salary creates official salary records for the selected employee and period.</div>
+                        <div class="notes-item">Dispatchers should only see their own salary data for the selected date range.</div>
+                        <div class="notes-item">Export functions are intended only for manager or accounting roles.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="salaryCheckCard" class="control-card">
+        <div class="salary-control-header">
+            <button id="toggleSalaryCheckPanelBtn" class="primary-blue-btn" type="button">Salary Check</button>
+            <button id="loadPreviewBtn" class="small-btn" type="button">Load Preview</button>
+            <button id="loadRecordsBtn" class="small-btn" type="button">Load Saved Records</button>
+            <button id="exportPreviewBtn" class="small-btn" type="button">Open Export Preview</button>
+            <button id="exportExcelBtn" class="small-btn" type="button">Download Excel</button>
+            <button id="toggleGeneratePanelBtn" class="small-btn" type="button">Generate Salary</button>
+        </div>
+
+        <div id="salaryCheckPanel" class="animated-panel open">
+            <div class="panel-inner">
+                <div class="panel-title">Salary Check</div>
+                <div class="panel-subtitle">
+                    Preview salary information for a selected period. This block does not generate official salary records.
+                </div>
+
+                <div class="filter-grid">
+                    <div class="filter-field">
+                        <label for="salaryStartDate">Start Date</label>
+                        <div class="input-with-picker">
+                            <input id="salaryStartDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
+                            <button id="salaryStartDatePickerBtn" class="picker-launch-btn" type="button">
+                                <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="salaryEndDate">End Date</label>
+                        <div class="input-with-picker">
+                            <input id="salaryEndDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
+                            <button id="salaryEndDatePickerBtn" class="picker-launch-btn" type="button">
+                                <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="salaryViewModeDisplay">View Mode</label>
+                        <div class="custom-trigger">
+                            <input id="salaryViewModeDisplay" class="compact-input custom-trigger-input" type="text" readonly value="Preview All">
+                            <input id="salaryViewMode" type="hidden" value="preview_all">
+                            <span class="custom-trigger-icon">
+                                <svg class="icon-svg"><use href="#icon-chevron-down"></use></svg>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="salary-actions-row">
+                    <button type="button" id="runSalaryViewBtn" class="primary-blue-btn">Run Selected View</button>
+                    <button type="button" id="resetSalaryFiltersBtn" class="small-btn">Reset</button>
+
+                    <span class="status-chip" id="salaryStatusChip">
+                        <span class="status-dot"></span>
+                        <span id="salaryStatusText">Ready</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div id="generateSalaryPanel" class="animated-panel hidden">
+            <div class="panel-inner">
+                <div class="panel-title">Generate Salary</div>
+                <div class="panel-subtitle">
+                    Generate an official salary record for the selected employee and selected period.
+                </div>
+
+                <form id="salaryForm" class="salary-form" novalidate>
+                    <div class="salary-form-grid">
+                        <div class="salary-field">
+                            <label for="generateStartDate">Start Date</label>
+                            <div class="input-with-picker">
+                                <input id="generateStartDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
+                                <button id="generateStartDatePickerBtn" class="picker-launch-btn" type="button" title="Pick start date">
+                                    <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="salary-field">
+                            <label for="generateEndDate">End Date</label>
+                            <div class="input-with-picker">
+                                <input id="generateEndDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
+                                <button id="generateEndDatePickerBtn" class="picker-launch-btn" type="button" title="Pick end date">
+                                    <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="salary-field">
+                            <label for="staffFullName">Staff Full Name</label>
+                            <input type="text" id="staffFullName" placeholder="Type full name of the staff">
+                        </div>
+
+                        <div class="salary-field">
+                            <label for="baseSalary">Base Salary</label>
+                            <input type="number" id="baseSalary" step="0.01" placeholder="Enter base salary">
+                        </div>
+
+                        <div class="salary-field">
+                            <label for="customBonus">Custom Bonus</label>
+                            <input type="number" id="customBonus" step="0.01" placeholder="Enter custom bonus">
+                        </div>
+
+                        <div class="salary-field">
+                            <label for="taxPercent">Tax Percent</label>
+                            <input type="number" id="taxPercent" step="0.01" placeholder="Enter tax percent">
+                        </div>
+
+                        <div class="salary-field hidden">
+                            <label for="staffId">Staff ID</label>
+                            <input type="number" id="staffId" placeholder="Enter staff ID (optional)">
+                        </div>
+                    </div>
+
+                    <div class="salary-actions-row">
+                        <button type="button" id="generateSalaryBtn" class="primary-blue-btn">Generate Official Salary</button>
+                        <button type="button" id="previewGenerateSalaryBtn" class="small-btn">Salary Preview</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="dispatcherSalaryCheckCard" class="control-card hidden">
+        <div class="salary-control-header">
+            <button id="toggleDispatcherSalaryCheckPanelBtn" class="primary-blue-btn" type="button">My Salary Check</button>
+        </div>
+
+        <div id="dispatcherSalaryCheckPanel" class="animated-panel open">
+            <div class="panel-inner">
+                <div class="panel-title">My Salary Check</div>
+                <div class="panel-subtitle">
+                    Check only your own salary result for the selected period.
+                </div>
+
+                <div class="filter-grid">
+                    <div class="filter-field">
+                        <label for="dispatcherStartDate">Start Date</label>
+                        <div class="input-with-picker">
+                            <input id="dispatcherStartDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
+                            <button id="dispatcherStartDatePickerBtn" class="picker-launch-btn" type="button" title="Pick start date">
+                                <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="dispatcherEndDate">End Date</label>
+                        <div class="input-with-picker">
+                            <input id="dispatcherEndDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
+                            <button id="dispatcherEndDatePickerBtn" class="picker-launch-btn" type="button" title="Pick end date">
+                                <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="dispatcherResultModeDisplay">Result Type</label>
+                        <div class="custom-trigger">
+                            <input id="dispatcherResultModeDisplay" class="compact-input custom-trigger-input" type="text" readonly value="My Preview">
+                            <input id="dispatcherResultMode" type="hidden" value="preview_my">
+                            <span class="custom-trigger-icon" aria-hidden="true">
+                                <svg class="icon-svg"><use href="#icon-chevron-down"></use></svg>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="salary-actions-row">
+                    <button type="button" id="dispatcherRunBtn" class="primary-blue-btn">Check My Salary</button>
+                    <button type="button" id="dispatcherResetBtn" class="small-btn">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section class="summary-grid">
+        <div class="summary-card">
+            <p class="summary-label">Total Records</p>
+            <h3 class="summary-value" id="summaryTotalRecords">0</h3>
+        </div>
+
+        <div class="summary-card">
+            <p class="summary-label">Total Gross</p>
+            <h3 class="summary-value" id="summaryTotalGross">$0</h3>
+        </div>
+
+        <div class="summary-card">
+            <p class="summary-label">Total Tax</p>
+            <h3 class="summary-value" id="summaryTotalTax">$0</h3>
+        </div>
+
+        <div class="summary-card">
+            <p class="summary-label">Total Net Salary</p>
+            <h3 class="summary-value" id="summaryTotalNet">$0</h3>
+        </div>
+    </section>
+
+    <div class="table-card">
+        <div class="card-header">
+            <div>
+                <h2 id="salaryTableTitle">Salary Result</h2>
+                <p id="salaryTableSubtitle">Preview and saved salary records for the selected period</p>
+            </div>
+        </div>
+
+        <div class="table-toolbar">
+            <div class="status-chip">
+                <span class="status-dot"></span>
+                <span id="salaryResultInfo">No data loaded yet</span>
+            </div>
+        </div>
+
+        <div class="salary-table-wrap">
+            <table class="data-table salary-table">
+                <thead>
+                    <tr id="salaryTableHeadRow">
+                        <th class="sortable-header" data-sort-key="employee">
+                            <span class="header-sort-wrap">Employee <span class="sort-indicator">↕</span></span>
+                        </th>
+                        <th class="sortable-header" data-sort-key="username">
+                            <span class="header-sort-wrap">Username <span class="sort-indicator">↕</span></span>
+                        </th>
+                        <th class="sortable-header" data-sort-key="role">
+                            <span class="header-sort-wrap">Role <span class="sort-indicator">↕</span></span>
+                        </th>
+                        <th class="sortable-header" data-sort-key="period_start">
+                            <span class="header-sort-wrap">Period Start <span class="sort-indicator">↕</span></span>
+                        </th>
+                        <th class="sortable-header" data-sort-key="period_end">
+                            <span class="header-sort-wrap">Period End <span class="sort-indicator">↕</span></span>
+                        </th>
+                        <th class="sortable-header" data-sort-key="shipments">
+                            <span class="header-sort-wrap">Shipments <span class="sort-indicator">↕</span></span>
+                        </th>
+                        <th class="sortable-header" data-sort-key="profit">
+                            <span class="header-sort-wrap">Profit <span class="sort-indicator">↕</span></span>
+                        </th>
+                        <th class="sortable-header" data-sort-key="estimated_salary">
+                            <span class="header-sort-wrap">Estimated Salary <span class="sort-indicator">↕</span></span>
+                        </th>
+                        <th>Base Salary</th>
+                        <th>Shipment Bonus</th>
+                        <th>Bonus</th>
+                        <th>Tax %</th>
+                        <th>Tax Amount</th>
+                        <th>Net Salary</th>
+                    </tr>
+                </thead>
+                <tbody id="salaryTableBody">
+                    <tr>
+                        <td colspan="14" class="empty-row">Load salary data to see results.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<div id="datePickerModal" class="modal">
+    <div class="modal-content date-modal-content">
+        <div class="date-modal-header">
+            <div class="date-modal-title" id="dateModalTitle">Select Date</div>
+            <div class="date-modal-nav">
+                <button type="button" id="datePrevMonthBtn" class="date-nav-btn">←</button>
+                <button type="button" id="dateNextMonthBtn" class="date-nav-btn">→</button>
+            </div>
+        </div>
+
+        <div class="panel-subtitle" id="dateCurrentMonthLabel">April 2026</div>
+
+        <div class="date-weekdays">
+            <div class="date-weekday">Mon</div>
+            <div class="date-weekday">Tue</div>
+            <div class="date-weekday">Wed</div>
+            <div class="date-weekday">Thu</div>
+            <div class="date-weekday">Fri</div>
+            <div class="date-weekday">Sat</div>
+            <div class="date-weekday">Sun</div>
+        </div>
+
+        <div class="date-grid" id="dateGrid"></div>
+
+        <div class="date-modal-footer">
+            <button type="button" id="dateClearBtn" class="small-btn">Clear</button>
+            <button type="button" id="dateCloseBtn" class="small-btn">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="salarySelectModal" class="modal hidden">
+    <div class="modal-content select-modal-content">
+        <div class="select-modal-header">
+            <div class="select-modal-title" id="salarySelectModalTitle">Select Option</div>
+        </div>
+
+        <div id="salarySelectOptionList" class="select-option-list"></div>
+
+        <div class="select-modal-footer">
+            <button type="button" id="salarySelectCloseBtn" class="small-btn">Close</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/salary.js?v=12"></script>
 </body>
 </html>

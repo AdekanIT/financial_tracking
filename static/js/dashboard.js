@@ -4,7 +4,7 @@ const TOKEN_KEY = "access_token";
 const USER_KEY = "user_data";
 
 let totalProfitEl, totalShipmentsEl, totalGrossEl, topDispatcherEl;
-let dispatcherTableBody, userNameEl, logoutBtn, chartTabs;
+let dispatcherTableBody, userNameEl, logoutBtn, chartTabs, toggleSidebarBtn;
 let dashboardTitleEl, dashboardSubtitleEl, tableTitleEl, tableSubtitleEl;
 
 let profitChartInstance = null;
@@ -32,6 +32,10 @@ function clearAuthAndRedirect() {
 
 function logout() {
     clearAuthAndRedirect();
+}
+
+function toggleSidebar() {
+    document.body.classList.toggle("sidebar-collapsed");
 }
 
 async function fetchWithAuth(url, options = {}) {
@@ -127,10 +131,7 @@ function updateSummaryCards() {
     if (totalProfitEl) totalProfitEl.textContent = formatCurrency(latest.profit);
     if (totalShipmentsEl) totalShipmentsEl.textContent = String(latest.shipments ?? 0);
     if (totalGrossEl) totalGrossEl.textContent = formatCurrency(latest.gross);
-
-    if (topDispatcherEl) {
-        topDispatcherEl.textContent = latest.period_label || "Current Period";
-    }
+    if (topDispatcherEl) topDispatcherEl.textContent = latest.period_label || "Current Period";
 }
 
 function createTextCell(text) {
@@ -398,6 +399,7 @@ document.addEventListener("DOMContentLoaded", () => {
     dispatcherTableBody = document.getElementById("dispatcherTableBody");
     userNameEl = document.getElementById("userName");
     logoutBtn = document.getElementById("logoutBtn");
+    toggleSidebarBtn = document.getElementById("toggleSidebarBtn");
     chartTabs = document.querySelectorAll(".chart-tab");
     dashboardTitleEl = document.getElementById("dashboardTitle");
     dashboardSubtitleEl = document.getElementById("dashboardSubtitle");
@@ -410,4 +412,5 @@ document.addEventListener("DOMContentLoaded", () => {
     loadDashboardData();
 
     if (logoutBtn) logoutBtn.addEventListener("click", logout);
+    if (toggleSidebarBtn) toggleSidebarBtn.addEventListener("click", toggleSidebar);
 });

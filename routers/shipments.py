@@ -10,6 +10,7 @@ from services.shipment_service import (
     get_my_shipments_service,
     get_all_shipments_service,
     get_shipment_by_id,
+    get_shipment_logs_service,
     update_shipment_service,
     delete_shipment_service
 )
@@ -80,7 +81,6 @@ class ShipmentDelete(BaseModel):
 
 # =======================================================
 # CREATE
-# manager + supervisor + accounting + dispatcher
 # =======================================================
 @router.post("/create")
 def create_new_shipment(
@@ -92,8 +92,6 @@ def create_new_shipment(
 
 # =======================================================
 # VISIBLE LIST
-# all authenticated users can see all shipments,
-# but service masks financial fields by role/ownership
 # =======================================================
 @router.get("/visible")
 def get_visible_shipments(
@@ -104,7 +102,6 @@ def get_visible_shipments(
 
 # =======================================================
 # GET MY
-# kept for compatibility
 # =======================================================
 @router.get("/my")
 def get_my_shipments(
@@ -115,13 +112,23 @@ def get_my_shipments(
 
 # =======================================================
 # GET ALL
-# kept for compatibility, now same visible logic
 # =======================================================
 @router.get("/all")
 def get_all_shipments(
     current_user: dict = Depends(get_current_user)
 ):
     return get_all_shipments_service(current_user)
+
+
+# =======================================================
+# GET LOGS
+# =======================================================
+@router.get("/logs/{shipment_id}")
+def get_shipment_logs(
+    shipment_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    return get_shipment_logs_service(shipment_id, current_user)
 
 
 # =======================================================
@@ -137,8 +144,6 @@ def get_one_shipment(
 
 # =======================================================
 # UPDATE
-# manager + supervisor + accounting + dispatcher
-# dispatcher can update only own shipments in service
 # =======================================================
 @router.put("/update")
 def update_shipment(
@@ -157,10 +162,36 @@ def update_shipment(
 
 # =======================================================
 # DELETE (SOFT)
-# manager + supervisor
+# compatible with current frontend
+# =======================================================
+@router.delete("/delete/{shipment_id}")
+def delete_shipment_by_path(
+    shipment_id: int,
+    current_user: dict = Depends(require_roles(["manager", "supervisor"]))
+):
+    return delete_shipment_service(
+        shipment_id=shipment_id,
+        current_user=current_user
+    )
+
+
+@router.delete("/delete")
+def delete_shipment_by_body(
+    data: ShipmentDelete,
+    current_user: dict = Depends(require_roles(["manager", "supervisor"]))
+):
+    return delete_shipment_service(
+        shipment_id=data.shipment_id,
+        current_user=current_user
+    )
+
+
+# =======================================================
+# LEGACY DELETE
+# kept for compatibility
 # =======================================================
 @router.put("/delete")
-def delete_shipment(
+def delete_shipment_legacy(
     data: ShipmentDelete,
     current_user: dict = Depends(require_roles(["manager", "supervisor"]))
 ):

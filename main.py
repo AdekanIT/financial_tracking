@@ -24,25 +24,37 @@ app.include_router(users.router)
 def root():
     return {"status": "working"}
 
+
 @app.get("/login")
 def login_page(request: Request):
     return templates.TemplateResponse("auth/login.html", {"request": request})
+
 
 @app.get("/dashboard")
 def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard/dashboard.html", {"request": request})
 
+
 @app.get("/shipments")
 def shipments_page(request: Request):
     return templates.TemplateResponse("shipments/shipments.html", {"request": request})
+
 
 @app.get("/salary")
 def salary_page(request: Request):
     return templates.TemplateResponse("salary/salary.html", {"request": request})
 
+
+# ✅ NEW ROUTE — Excel Preview Page
+@app.get("/excel")
+def excel_page(request: Request):
+    return templates.TemplateResponse("salary/excel.html", {"request": request})
+
+
 @app.get("/users")
 def users_page(request: Request):
     return templates.TemplateResponse("users/users.html", {"request": request})
+
 
 @app.get("/archive")
 def archive_page(request: Request):

@@ -764,6 +764,102 @@ textarea {
     box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
 }
 
+/* =========================
+   TIME INPUT FIX
+========================= */
+
+.form-group input[type="time"] {
+    color-scheme: dark;
+    background-color: #0d131b;
+    color: #ffffff;
+}
+
+.form-group input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(2.5) contrast(1.2);
+    opacity: 1;
+    cursor: pointer;
+}
+
+.form-group input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    filter: invert(1) brightness(3) contrast(1.2);
+}
+
+.form-group input[type="time"]::-webkit-datetime-edit,
+.form-group input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+.form-group input[type="time"]::-webkit-datetime-edit-hour-field,
+.form-group input[type="time"]::-webkit-datetime-edit-minute-field,
+.form-group input[type="time"]::-webkit-datetime-edit-ampm-field {
+    color: #ffffff;
+}
+
+.form-group input[type="time"]::-webkit-clear-button,
+.form-group input[type="time"]::-webkit-inner-spin-button {
+    filter: invert(1) brightness(2.2);
+}
+
+#pickup_time,
+#delivery_time {
+    color-scheme: dark;
+    background: #0d131b;
+    color: #ffffff;
+}
+
+.time-input-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.time-input-wrap input[type="time"] {
+    width: 100%;
+    padding-right: 42px;
+    color-scheme: dark;
+    background-color: #0d131b;
+    color: #ffffff;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+}
+
+.time-input-wrap input[type="time"]::-webkit-calendar-picker-indicator {
+    opacity: 0;
+    display: block;
+    position: absolute;
+    right: 0;
+    width: 42px;
+    height: 100%;
+    cursor: pointer;
+}
+
+.time-input-wrap input[type="time"]::-webkit-datetime-edit,
+.time-input-wrap input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+.time-input-wrap input[type="time"]::-webkit-datetime-edit-hour-field,
+.time-input-wrap input[type="time"]::-webkit-datetime-edit-minute-field,
+.time-input-wrap input[type="time"]::-webkit-datetime-edit-ampm-field {
+    color: #ffffff;
+}
+
+.time-input-wrap input[type="time"]::-webkit-clear-button,
+.time-input-wrap input[type="time"]::-webkit-inner-spin-button {
+    display: none;
+}
+
+.time-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #ffffff;
+    pointer-events: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.time-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
 .calculated-box {
     padding: 14px 16px;
     border-radius: 14px;

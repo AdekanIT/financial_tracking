@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | Financial Tracking System</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=13">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Excel Preview | Financial Tracking System</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=12">
     <style>
         :root {
             color-scheme: dark;
@@ -173,7 +172,7 @@
             background: transparent !important;
         }
 
-        .dashboard-page-top {
+        .excel-page-top {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
@@ -182,35 +181,48 @@
             margin-bottom: 16px;
         }
 
-        .dashboard-page-top-right {
+        .excel-page-top-right {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 10px;
-            flex-wrap: wrap;
         }
 
-        .user-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 42px;
-            padding: 10px 14px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(147, 197, 253, 0.14);
+        .small-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
             color: #dce7f5;
-            font-weight: 600;
+            background: rgba(255, 255, 255, 0.03);
+            transition: 0.2s ease;
         }
 
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(180px, 1fr));
-            gap: 14px;
-            margin-bottom: 16px;
+        .small-btn:hover {
+            background: rgba(59, 130, 246, 0.10);
+            border-color: rgba(96, 165, 250, 0.34);
         }
 
+        .primary-blue-btn {
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: white;
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+            transition: 0.2s ease;
+        }
+
+        .primary-blue-btn:hover {
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+            transform: translateY(-1px);
+        }
+
+        .control-card,
         .summary-card,
-        .chart-panel,
         .table-card,
         .notes-card {
             background: rgba(18, 24, 33, 0.92);
@@ -219,8 +231,95 @@
             box-shadow: 0 0 24px rgba(59, 130, 246, 0.10);
         }
 
+        .control-card {
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
         .summary-card {
             padding: 16px;
+        }
+
+        .notes-card {
+            width: 280px;
+            padding: 16px;
+        }
+
+        .card-header {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .card-header h2 {
+            margin: 0 0 6px 0;
+            font-size: 18px;
+            color: #f8fbff;
+        }
+
+        .card-header p {
+            margin: 0;
+            color: #8ea0b8;
+            font-size: 12px;
+        }
+
+        .notes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .notes-item {
+            color: #cbd5e1;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .excel-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .toolbar-label {
+            font-size: 12px;
+            color: #8ea0b8;
+            font-weight: 700;
+            margin-right: 6px;
+        }
+
+        .period-chip,
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255,255,255,0.03);
+            color: #dce7f5;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #60a5fa;
+            display: inline-block;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(170px, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
         }
 
         .summary-label {
@@ -237,115 +336,62 @@
             font-weight: 800;
         }
 
-        .chart-panel,
-        .table-card,
-        .notes-card {
+        .table-card {
             padding: 16px;
         }
 
-        .chart-panel {
-            margin-bottom: 16px;
-        }
-
-        .chart-panel-header,
-        .card-header {
+        .table-toolbar {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
             gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
             margin-bottom: 12px;
         }
 
-        .chart-panel-header h2,
-        .card-header h2 {
-            margin: 0 0 6px 0;
-            font-size: 18px;
-            color: #f8fbff;
-        }
-
-        .chart-panel-header p,
-        .card-header p {
-            margin: 0;
-            color: #8ea0b8;
-            font-size: 12px;
-        }
-
-        .chart-switcher {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .chart-tab {
-            border: 1px solid rgba(147, 197, 253, 0.16);
-            background: rgba(255, 255, 255, 0.03);
-            color: #dce7f5;
-            padding: 10px 14px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: 0.2s ease;
-            font-weight: 700;
-            font-size: 12px;
-        }
-
-        .chart-tab:hover,
-        .chart-tab.active {
-            background: rgba(59, 130, 246, 0.16);
-            color: white;
-            border-color: rgba(96, 165, 250, 0.34);
-        }
-
-        .chart-card {
-            height: 400px;
-            position: relative;
-        }
-
-        .bottom-grid {
-            display: grid;
-            grid-template-columns: 1.5fr 1fr;
-            gap: 16px;
-        }
-
-        .table-wrapper {
-            overflow-x: auto;
+        .excel-table-wrap {
+            overflow: auto;
             border-radius: 14px;
             scrollbar-width: thin;
             scrollbar-color: rgba(96,165,250,0.5) rgba(255,255,255,0.04);
         }
 
-        .table-wrapper::-webkit-scrollbar {
+        .excel-table-wrap::-webkit-scrollbar {
             height: 10px;
             width: 10px;
         }
 
-        .table-wrapper::-webkit-scrollbar-track {
+        .excel-table-wrap::-webkit-scrollbar-track {
             background: rgba(255,255,255,0.04);
             border-radius: 999px;
         }
 
-        .table-wrapper::-webkit-scrollbar-thumb {
+        .excel-table-wrap::-webkit-scrollbar-thumb {
             background: rgba(96,165,250,0.55);
             border-radius: 999px;
         }
 
-        .data-table {
-            width: 100%;
+        .excel-table {
+            width: max-content;
+            min-width: 100%;
             border-collapse: separate;
             border-spacing: 0;
+            table-layout: fixed;
         }
 
-        .data-table th,
-        .data-table td {
+        .excel-table th,
+        .excel-table td {
             vertical-align: middle;
             font-size: 12px;
             padding: 10px 10px !important;
+            max-width: 190px;
+            overflow: hidden;
+            text-overflow: ellipsis;
             white-space: nowrap;
             background: rgba(18, 24, 33, 0.94);
-            color: #dce7f5;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         }
 
-        .data-table th {
+        .excel-table th {
             position: sticky;
             top: 0;
             z-index: 5;
@@ -360,67 +406,56 @@
             padding: 28px 16px !important;
         }
 
-        .info-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-top: 4px;
+        .money-positive {
+            color: #86efac;
+            font-weight: 700;
         }
 
-        .info-item {
-            display: flex;
-            gap: 12px;
-            align-items: flex-start;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 14px;
-            border: 1px solid rgba(147, 197, 253, 0.10);
+        .money-neutral {
+            color: #dbe7f5;
+            font-weight: 700;
         }
 
-        .info-dot {
-            width: 10px;
-            height: 10px;
-            margin-top: 6px;
-            border-radius: 50%;
-            background: linear-gradient(90deg, #3b82f6, #a5f3fc);
-            flex-shrink: 0;
+        .role-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(59, 130, 246, 0.14);
+            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.22);
         }
 
-        .info-item p {
-            color: #cbd5e1;
-            font-size: 12px;
-            line-height: 1.6;
-            margin: 0;
+        .muted-value {
+            color: #8ea0b8;
         }
 
-        @media (max-width: 1200px) {
+        @media (max-width: 1400px) {
             .summary-grid {
-                grid-template-columns: repeat(2, minmax(180px, 1fr));
-            }
-
-            .bottom-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(3, minmax(170px, 1fr));
             }
         }
 
-        @media (max-width: 900px) {
-            .dashboard-page-top {
+        @media (max-width: 1100px) {
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(170px, 1fr));
+            }
+
+            .excel-page-top {
                 flex-direction: column;
             }
 
-            .chart-panel-header {
-                flex-direction: column;
-                align-items: flex-start;
+            .notes-card {
+                width: 100%;
             }
         }
 
         @media (max-width: 700px) {
             .summary-grid {
                 grid-template-columns: 1fr;
-            }
-
-            .chart-card {
-                height: 320px;
             }
         }
     </style>
@@ -449,12 +484,6 @@
         <path d="M5 20C6.8 16.8 9 15.5 12 15.5C15 15.5 17.2 16.8 19 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
     </symbol>
 
-    <symbol id="icon-archive" viewBox="0 0 24 24">
-        <rect x="3" y="5" width="18" height="4" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
-        <path d="M5 9H19V19C19 20.1 18.1 21 17 21H7C5.9 21 5 20.1 5 19V9Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
-        <path d="M9 13H15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-    </symbol>
-
     <symbol id="icon-logout" viewBox="0 0 24 24">
         <path d="M15 16L20 12L15 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M20 12H9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -469,6 +498,12 @@
 
     <symbol id="icon-menu-close" viewBox="0 0 24 24">
         <path d="M9 6L15 12L9 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <symbol id="icon-archive" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="4" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M5 9H19V19H5Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M9 13H15" stroke="currentColor" stroke-width="1.8"/>
     </symbol>
 </svg>
 
@@ -487,7 +522,7 @@
         </div>
 
         <nav class="sidebar-nav">
-            <a href="/dashboard" class="nav-link active">
+            <a href="/dashboard" class="nav-link">
                 <span class="nav-link-icon">
                     <svg class="icon-svg"><use href="#icon-dashboard"></use></svg>
                 </span>
@@ -501,7 +536,7 @@
                 <span class="nav-link-text">Shipments</span>
             </a>
 
-            <a href="/salary" class="nav-link">
+            <a href="/salary" class="nav-link active">
                 <span class="nav-link-icon">
                     <svg class="icon-svg"><use href="#icon-dollar"></use></svg>
                 </span>
@@ -533,121 +568,120 @@
 </aside>
 
 <main class="dashboard-main">
-    <div class="dashboard-page-top">
+    <div class="excel-page-top">
         <div>
-            <h1 class="page-title" id="dashboardTitle">Dashboard</h1>
-            <p class="page-subtitle" id="dashboardSubtitle">
-                Logistics financial overview and shipment performance trends
+            <h1 class="page-title">Salary Excel Preview</h1>
+            <p class="page-subtitle" id="previewSubtitle">
+                Full salary export preview for the selected period
             </p>
         </div>
 
-        <div class="dashboard-page-top-right">
-            <div class="user-badge">
-                <span id="userName">User</span>
+        <div class="excel-page-top-right">
+            <div class="notes-card">
+                <div class="card-header" style="margin-bottom:0;">
+                    <div>
+                        <h2 style="font-size:14px; margin:0;">Export Notes</h2>
+                    </div>
+                </div>
+
+                <div class="notes-list">
+                    <div class="notes-item">This page is intended to preview the exact salary data before Excel download.</div>
+                    <div class="notes-item">Only saved salary records should be shown here, not temporary preview rows.</div>
+                    <div class="notes-item">Use Download Excel when everything looks correct for the selected period.</div>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <div class="control-card">
+        <div class="excel-toolbar">
+            <span class="toolbar-label">Preview Actions:</span>
+            <span class="period-chip" id="periodChip">Period: —</span>
+            <button id="backToSalaryBtn" class="small-btn" type="button">Back to Salary</button>
+            <button id="refreshPreviewBtn" class="small-btn" type="button">Refresh</button>
+            <button id="downloadExcelBtn" class="primary-blue-btn" type="button">Download Excel</button>
         </div>
     </div>
 
     <section class="summary-grid">
         <div class="summary-card">
-            <p class="summary-label">Total Profit</p>
-            <p class="summary-value" id="totalProfit">$0</p>
+            <p class="summary-label">Total Records</p>
+            <h3 class="summary-value" id="summaryTotalRecords">0</h3>
         </div>
 
         <div class="summary-card">
-            <p class="summary-label">Total Shipments</p>
-            <p class="summary-value" id="totalShipments">0</p>
+            <p class="summary-label">Total Gross Payroll</p>
+            <h3 class="summary-value" id="summaryTotalGross">$0</h3>
         </div>
 
         <div class="summary-card">
-            <p class="summary-label">Gross</p>
-            <p class="summary-value" id="totalGross">$0</p>
+            <p class="summary-label">Total Tax</p>
+            <h3 class="summary-value" id="summaryTotalTax">$0</h3>
         </div>
 
         <div class="summary-card">
-            <p class="summary-label">Current Period</p>
-            <p class="summary-value" id="topDispatcher">—</p>
+            <p class="summary-label">Total Net Salaries</p>
+            <h3 class="summary-value" id="summaryTotalNet">$0</h3>
+        </div>
+
+        <div class="summary-card">
+            <p class="summary-label">Top Employee</p>
+            <h3 class="summary-value" id="summaryTopEmployee">—</h3>
+        </div>
+
+        <div class="summary-card">
+            <p class="summary-label">Top Net Salary</p>
+            <h3 class="summary-value" id="summaryTopSalary">$0</h3>
         </div>
     </section>
 
-    <section class="chart-panel">
-        <div class="chart-panel-header">
+    <div class="table-card">
+        <div class="card-header">
             <div>
-                <h2>Analytics</h2>
-                <p>Switch between chart views</p>
-            </div>
-
-            <div class="chart-switcher">
-                <button class="chart-tab" data-chart="doughnut">Contribution</button>
-                <button class="chart-tab active" data-chart="line">Trend</button>
-                <button class="chart-tab" data-chart="bar">Bar</button>
+                <h2>Excel Export Table</h2>
+                <p>Detailed salary record preview before downloading the Excel file</p>
             </div>
         </div>
 
-        <div class="chart-card">
-            <canvas id="profitChart"></canvas>
-        </div>
-    </section>
-
-    <section class="bottom-grid">
-        <div class="table-card">
-            <div class="card-header">
-                <div>
-                    <h2 id="tableTitle">Breakdown</h2>
-                    <p id="tableSubtitle">Performance details for the latest period</p>
-                </div>
+        <div class="table-toolbar">
+            <div class="status-chip">
+                <span class="status-dot"></span>
+                <span id="previewStatusText">Ready</span>
             </div>
 
-            <div class="table-wrapper">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Label</th>
-                            <th>Shipments</th>
-                            <th>Profit</th>
-                            <th>Share</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dispatcherTableBody">
-                        <tr>
-                            <td colspan="5" class="empty-row">Loading data...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <div class="muted-value" id="previewResultInfo">No preview loaded yet</div>
         </div>
 
-        <div class="notes-card">
-            <div class="card-header">
-                <div>
-                    <h2>Dashboard Notes</h2>
-                    <p>Quick overview</p>
-                </div>
-            </div>
-
-            <div class="info-list">
-                <div class="info-item">
-                    <span class="info-dot"></span>
-                    <p>Doughnut chart shows the latest period contribution breakdown.</p>
-                </div>
-                <div class="info-item">
-                    <span class="info-dot"></span>
-                    <p>Line chart shows profit trend by month.</p>
-                </div>
-                <div class="info-item">
-                    <span class="info-dot"></span>
-                    <p>Bar chart compares monthly profit values.</p>
-                </div>
-                <div class="info-item">
-                    <span class="info-dot"></span>
-                    <p>The visible data depends on your role and permissions.</p>
-                </div>
-            </div>
+        <div class="excel-table-wrap">
+            <table class="data-table excel-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Staff ID</th>
+                        <th>Period Start</th>
+                        <th>Period End</th>
+                        <th>Base Salary</th>
+                        <th>Shipment Bonus</th>
+                        <th>Bonus</th>
+                        <th>Gross Salary</th>
+                        <th>Tax %</th>
+                        <th>Tax Amount</th>
+                        <th>Net Salary</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody id="excelPreviewTableBody">
+                    <tr>
+                        <td colspan="14" class="empty-row">Loading preview...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-    </section>
+    </div>
 </main>
 
-<script src="/static/js/dashboard.js?v=13"></script>
+<script src="/static/js/excel.js"></script>
 </body>
 </html>
