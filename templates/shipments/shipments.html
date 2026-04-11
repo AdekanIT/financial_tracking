@@ -1,21 +1,1183 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Shipments</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+
+        html, body {
+            min-height: 100%;
+            background:
+                radial-gradient(circle at top right, rgba(37, 99, 235, 0.10), transparent 28%),
+                radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 26%),
+                linear-gradient(180deg, #0b1118 0%, #0f1722 100%);
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+
+        body.sidebar-collapsed .sidebar {
+            width: 88px;
+            min-width: 88px;
+            padding-left: 12px;
+            padding-right: 12px;
+        }
+
+        body.sidebar-collapsed .sidebar .logo-title,
+        body.sidebar-collapsed .sidebar .nav-link-text,
+        body.sidebar-collapsed .sidebar .logout-btn span,
+        body.sidebar-collapsed .sidebar .sidebar-toggle-btn span:last-child {
+            display: none;
+        }
+
+        body.sidebar-collapsed .sidebar .nav-link {
+            justify-content: center;
+            padding: 14px 10px;
+        }
+
+        body.sidebar-collapsed .sidebar .sidebar-toggle-btn {
+            justify-content: center;
+        }
+
+        body.sidebar-collapsed .sidebar .logout-btn {
+            justify-content: center;
+            padding: 14px 10px;
+        }
+
+        body.sidebar-collapsed .sidebar .logo-wrap {
+            justify-content: center;
+        }
+
+        .sidebar-top {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .sidebar-toggle-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255, 255, 255, 0.04);
+            color: #dce7f5;
+            border-radius: 12px;
+            height: 38px;
+            min-width: 38px;
+            padding: 0 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: 0.18s ease;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .sidebar-toggle-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-link-icon {
+            font-size: 16px;
+            width: 18px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .logout-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .dashboard-main {
+            min-width: 0;
+            width: 100%;
+            background: transparent !important;
+        }
+
+        .shipments-page-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .small-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #dce7f5;
+            background: rgba(255, 255, 255, 0.03);
+            transition: 0.2s ease;
+        }
+
+        .small-btn:hover {
+            background: rgba(59, 130, 246, 0.10);
+            border-color: rgba(96, 165, 250, 0.34);
+        }
+
+        .primary-blue-btn {
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: white;
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+            transition: 0.2s ease;
+        }
+
+        .primary-blue-btn:hover {
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+            transform: translateY(-1px);
+        }
+
+        .compact-select,
+        .compact-input,
+        .modal-form input,
+        .modal-form select,
+        .modal-form textarea {
+            padding: 9px 11px;
+            border-radius: 10px;
+            border: 1px solid rgba(147, 197, 253, 0.14);
+            background: #0d131b;
+            color: white;
+            font-size: 12px;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .compact-select:focus,
+        .compact-input:focus,
+        .modal-form input:focus,
+        .modal-form select:focus,
+        .modal-form textarea:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
+        }
+
+        input[type="date"],
+        input[type="month"],
+        input[type="time"] {
+            color-scheme: dark;
+        }
+
+        input[type="date"]::-webkit-calendar-picker-indicator,
+        input[type="month"]::-webkit-calendar-picker-indicator,
+        input[type="time"]::-webkit-calendar-picker-indicator {
+            filter: invert(1) brightness(1.4);
+            opacity: 1;
+            cursor: pointer;
+        }
+
+        .control-card,
+        .table-card {
+            background: rgba(18, 24, 33, 0.92);
+            border: 1px solid rgba(120, 170, 255, 0.18);
+            border-radius: 18px;
+            box-shadow: 0 0 24px rgba(59, 130, 246, 0.10);
+        }
+
+        .control-card {
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
+        .shipments-control-header {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .shipments-control-header .compact-select {
+            width: auto;
+            min-width: 130px;
+        }
+
+        .animated-panel {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+            transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.18s ease;
+        }
+
+        .animated-panel.open {
+            max-height: 1200px;
+            opacity: 1;
+            margin-top: 14px;
+        }
+
+        .panel-inner {
+            border-top: 1px solid rgba(120, 170, 255, 0.14);
+            padding-top: 14px;
+        }
+
+        .panel-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 6px;
+        }
+
+        .panel-subtitle {
+            font-size: 12px;
+            color: #8ea0b8;
+            margin-bottom: 12px;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(145px, 190px));
+            gap: 10px;
+            justify-content: start;
+            align-items: end;
+        }
+
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            align-items: flex-start;
+        }
+
+        .filter-field label {
+            font-size: 12px;
+            color: #b8c4d6;
+            font-weight: 600;
+        }
+
+        .input-with-picker {
+            position: relative;
+            width: 100%;
+        }
+
+        .input-with-picker input {
+            padding-right: 42px;
+        }
+
+        .picker-launch-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: transparent;
+            color: #ffffff;
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            opacity: 0.96;
+        }
+
+        .picker-launch-btn:hover {
+            opacity: 1;
+        }
+
+        .column-toolbar-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .column-zone {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(147, 197, 253, 0.14);
+            border-radius: 14px;
+            padding: 12px;
+            min-height: 170px;
+        }
+
+        .column-zone-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #dce7f5;
+            margin-bottom: 10px;
+        }
+
+        .column-zone-subtitle {
+            font-size: 12px;
+            color: #8ea0b8;
+            margin-bottom: 12px;
+        }
+
+        .column-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: flex-start;
+            min-height: 80px;
+        }
+
+        .column-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 11px;
+            border-radius: 12px;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            color: #dbe7f5;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: grab;
+            user-select: none;
+            white-space: nowrap;
+            transition: 0.12s ease;
+        }
+
+        .column-chip:hover {
+            border-color: rgba(96, 165, 250, 0.34);
+            background: rgba(59, 130, 246, 0.14);
+        }
+
+        .column-chip.dragging {
+            opacity: 0.5;
+            transform: scale(0.98);
+        }
+
+        .column-chip-order {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.08);
+            font-size: 11px;
+            font-weight: 700;
+            color: #dce7f5;
+        }
+
+        .zone-drop-hover {
+            border-color: rgba(96, 165, 250, 0.42);
+            background: rgba(59, 130, 246, 0.07);
+        }
+
+        .shipments-table-wrap {
+            overflow: auto;
+            border-radius: 14px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(96,165,250,0.5) rgba(255,255,255,0.04);
+            position: relative;
+            z-index: 1;
+        }
+
+        .shipments-table-wrap::-webkit-scrollbar {
+            height: 10px;
+            width: 10px;
+        }
+
+        .shipments-table-wrap::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.04);
+            border-radius: 999px;
+        }
+
+        .shipments-table-wrap::-webkit-scrollbar-thumb {
+            background: rgba(96,165,250,0.55);
+            border-radius: 999px;
+        }
+
+        .shipments-table {
+            width: max-content;
+            min-width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed;
+        }
+
+        .shipments-table th,
+        .shipments-table td {
+            vertical-align: middle;
+            font-size: 12px;
+            padding: 10px 10px !important;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            background: rgba(18, 24, 33, 0.94);
+        }
+
+        .shipments-table th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: #111827;
+        }
+
+        .shipments-table .wide-cell {
+            max-width: 240px;
+        }
+
+        .location-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid transparent;
+        }
+
+        .loc-pending {
+            background: rgba(56, 189, 248, 0.12);
+            color: #7dd3fc;
+            border-color: rgba(56, 189, 248, 0.20);
+        }
+
+        .loc-done {
+            background: rgba(34, 197, 94, 0.12);
+            color: #86efac;
+            border-color: rgba(34, 197, 94, 0.20);
+        }
+
+        .actions-cell {
+            position: relative;
+            min-width: 60px;
+            max-width: 60px;
+            overflow: visible !important;
+            z-index: 120;
+        }
+
+        .action-menu-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255, 255, 255, 0.03);
+            color: #dce7f5;
+            border-radius: 10px;
+            width: 34px;
+            height: 34px;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            transition: 0.2s ease;
+        }
+
+        .action-menu-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.34);
+        }
+
+        .action-dropdown {
+            position: absolute;
+            right: 42px;
+            top: 0;
+            min-width: 180px;
+            max-width: 180px;
+            background: rgba(14, 19, 28, 0.995);
+            border: 1px solid rgba(120, 170, 255, 0.18);
+            border-radius: 12px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
+            padding: 6px;
+            display: none;
+            z-index: 999;
+            transform: translateY(4px) translateX(-6px) scale(0.98);
+            opacity: 0;
+            transition: opacity 0.14s ease, transform 0.14s ease;
+            backdrop-filter: blur(8px);
+        }
+
+        .action-dropdown.open {
+            display: block;
+            opacity: 1;
+            transform: translateY(0) translateX(0) scale(1);
+        }
+
+        .action-dropdown button {
+            width: 100%;
+            text-align: left;
+            padding: 8px 10px;
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            color: #dce7f5;
+            cursor: pointer;
+            font-size: 12px;
+            transition: 0.18s ease;
+        }
+
+        .action-dropdown button:hover {
+            background: rgba(59, 130, 246, 0.10);
+        }
+
+        .action-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.08);
+            margin: 6px 0;
+        }
+
+        .shipment-status {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 86px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: capitalize;
+        }
+
+        .status-created {
+            background: rgba(56, 189, 248, 0.14);
+            color: #7dd3fc;
+            border: 1px solid rgba(56, 189, 248, 0.22);
+        }
+
+        .status-picked_up,
+        .status-in_transit {
+            background: rgba(59, 130, 246, 0.14);
+            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.22);
+        }
+
+        .status-delivered {
+            background: rgba(34, 197, 94, 0.14);
+            color: #86efac;
+            border: 1px solid rgba(34, 197, 94, 0.22);
+        }
+
+        .status-canceled,
+        .status-cancelled {
+            background: rgba(239, 68, 68, 0.14);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.22);
+        }
+
+        .status-tonu {
+            background: rgba(245, 158, 11, 0.14);
+            color: #fcd34d;
+            border: 1px solid rgba(245, 158, 11, 0.22);
+        }
+
+        .masked-finance {
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .modal {
+            cursor: pointer;
+        }
+
+        .modal-content {
+            max-width: 1400px !important;
+            width: 96% !important;
+            cursor: default;
+            max-height: 92vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(96,165,250,0.5) rgba(255,255,255,0.04);
+            background: rgba(15, 23, 34, 0.98);
+        }
+
+        .modal-content::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .modal-content::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.04);
+            border-radius: 999px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb {
+            background: rgba(96,165,250,0.55);
+            border-radius: 999px;
+        }
+
+        .form-grid {
+            grid-template-columns: repeat(4, 1fr) !important;
+        }
+
+        .form-group.full-row {
+            grid-column: 1 / -1;
+        }
+
+        .modal-actions {
+            justify-content: space-between !important;
+            align-items: center;
+        }
+
+        .modal-actions-left,
+        .modal-actions-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .save-small-btn {
+            padding: 10px 14px !important;
+            font-size: 13px !important;
+            width: auto !important;
+            min-width: 120px;
+        }
+
+        .logs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .log-card {
+            border: 1px solid rgba(147, 197, 253, 0.14);
+            background: rgba(255,255,255,0.03);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .log-card-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
+
+        .log-user {
+            font-size: 13px;
+            font-weight: 700;
+            color: #dce7f5;
+        }
+
+        .log-date {
+            font-size: 12px;
+            color: #93a4bb;
+        }
+
+        .log-field {
+            font-size: 12px;
+            color: #93c5fd;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .log-values {
+            font-size: 12px;
+            color: #cbd5e1;
+            display: grid;
+            gap: 6px;
+        }
+
+        .log-value-box {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(147, 197, 253, 0.10);
+            border-radius: 10px;
+            padding: 8px 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .empty-logs {
+            padding: 20px 0;
+            color: #94a3b8;
+            font-size: 13px;
+        }
+
+        .date-modal-content {
+            max-width: 360px !important;
+            width: 94% !important;
+            padding: 18px;
+            border-radius: 20px;
+        }
+
+        .date-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .date-modal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .date-modal-nav {
+            display: flex;
+            gap: 8px;
+        }
+
+        .date-nav-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255,255,255,0.03);
+            color: #e2e8f0;
+            cursor: pointer;
+        }
+
+        .date-nav-btn:hover {
+            background: rgba(59, 130, 246, 0.10);
+        }
+
+        .date-weekdays,
+        .date-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .date-weekdays {
+            margin-bottom: 8px;
+        }
+
+        .date-weekday {
+            text-align: center;
+            font-size: 11px;
+            color: #8ea0b8;
+            padding: 4px 0;
+            font-weight: 700;
+        }
+
+        .date-day-btn {
+            height: 40px;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            background: rgba(255,255,255,0.03);
+            color: #e2e8f0;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: 0.15s ease;
+        }
+
+        .date-day-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.22);
+        }
+
+        .date-day-btn.muted {
+            color: #64748b;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .date-day-btn.active {
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+            color: white;
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .date-modal-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        @media (max-width: 1300px) {
+            .filter-grid {
+                grid-template-columns: repeat(3, minmax(145px, 190px));
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .form-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+
+            .column-toolbar-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .filter-grid {
+                grid-template-columns: repeat(2, minmax(145px, 190px));
+            }
+        }
+
+        @media (max-width: 700px) {
+            .form-grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
-<body>
+<body class="dashboard-body">
 
-<h1>Shipments</h1>
+<aside class="sidebar">
+    <div class="sidebar-top">
+        <div class="logo-wrap">
+            <h2 class="logo-title">FTMS</h2>
+            <button id="toggleSidebarBtn" class="sidebar-toggle-btn" type="button" title="Toggle Sidebar">
+                <span>⇆</span>
+                <span>Toggle</span>
+            </button>
+        </div>
 
-<button onclick="createShipment()">Create</button>
+        <nav class="sidebar-nav">
+            <a href="/dashboard" class="nav-link">
+                <span class="nav-link-icon">📊</span>
+                <span class="nav-link-text">Dashboard</span>
+            </a>
 
-<table>
-    <tbody id="shipmentsTable"></tbody>
-</table>
+            <a href="/shipments" class="nav-link active">
+                <span class="nav-link-icon">📦</span>
+                <span class="nav-link-text">Shipments</span>
+            </a>
 
-<script src="/static/js/api.js"></script>
-<script src="/static/js/auth.js"></script>
-<script src="/static/js/shipments.js"></script>
+            <a href="/salary" class="nav-link">
+                <span class="nav-link-icon">💵</span>
+                <span class="nav-link-text">Salary</span>
+            </a>
+
+            <a href="/users" class="nav-link">
+                <span class="nav-link-icon">👤</span>
+                <span class="nav-link-text">Users</span>
+            </a>
+        </nav>
+    </div>
+
+    <button id="logoutBtn" class="logout-btn">
+        <span>⎋</span>
+        <span>Logout</span>
+    </button>
+</aside>
+
+<main class="dashboard-main">
+    <div class="shipments-page-top">
+        <div>
+            <h1 class="page-title">Shipments</h1>
+            <p class="page-subtitle">All visible shipments based on your role permissions</p>
+        </div>
+    </div>
+
+    <div class="control-card">
+        <div class="shipments-control-header">
+            <button class="primary-blue-btn" onclick="openCreateModal()">Create Shipment</button>
+            <button id="toggleColumnsBtn" class="small-btn" type="button">Column Manager</button>
+            <button id="toggleFiltersBtn" class="small-btn" type="button">Filters</button>
+
+            <select id="timeFormatSelect" class="compact-select">
+                <option value="12">AM / PM</option>
+                <option value="24">24 Hours</option>
+            </select>
+        </div>
+
+        <div id="filtersPanel" class="animated-panel">
+            <div class="panel-inner">
+                <div class="panel-title">Filters</div>
+                <div class="panel-subtitle">Filter shipments by references, created date, general text, and month.</div>
+
+                <div class="filter-grid">
+                    <div class="filter-field">
+                        <label for="filterCompanyReference">Company Ref</label>
+                        <input id="filterCompanyReference" class="compact-input" type="text" placeholder="Company ref">
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="filterBrokerReference">Broker Ref</label>
+                        <input id="filterBrokerReference" class="compact-input" type="text" placeholder="Broker ref">
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="filterCreatedDate">Created Date</label>
+                        <div class="input-with-picker">
+                            <input id="filterCreatedDate" class="compact-input" type="text" placeholder="dd/mm/yyyy">
+                            <button id="filterCreatedDatePickerBtn" class="picker-launch-btn" type="button" title="Pick date">◻</button>
+                        </div>
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="filterGlobalSearch">Search</label>
+                        <input id="filterGlobalSearch" class="compact-input" type="text" placeholder="Search">
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="filterMonth">Month</label>
+                        <input id="filterMonth" class="compact-input" type="month" title="Select month">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="columnToolbar" class="animated-panel">
+            <div class="panel-inner">
+                <div class="panel-title">Column Manager</div>
+                <div class="panel-subtitle">Visible columns control the table order. Drag cards between sections and reorder them.</div>
+
+                <div class="column-toolbar-grid">
+                    <div id="visibleColumnsZone" class="column-zone">
+                        <div class="column-zone-title">Visible Columns</div>
+                        <div class="column-zone-subtitle">These columns are shown in the table in this same order.</div>
+                        <div id="visibleColumnList" class="column-chip-list"></div>
+                    </div>
+
+                    <div id="hiddenColumnsZone" class="column-zone">
+                        <div class="column-zone-title">Hidden Columns</div>
+                        <div class="column-zone-subtitle">Drag a column here to hide it from the table.</div>
+                        <div id="hiddenColumnList" class="column-chip-list"></div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 14px;">
+                    <button class="small-btn" id="resetColumnsBtn" type="button">Reset Columns</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <div class="shipments-table-wrap">
+            <table class="data-table shipments-table">
+                <thead>
+                <tr id="shipmentsHeaderRow"></tr>
+                </thead>
+                <tbody id="shipmentsTable">
+                <tr>
+                    <td colspan="25" class="empty-row">Loading...</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<div id="shipmentModal" class="modal">
+    <div class="modal-content">
+        <h2 id="shipmentModalTitle">Create Shipment</h2>
+        <p class="modal-subtitle">Fill in shipment details and save to the system</p>
+
+        <form id="shipmentForm" class="modal-form">
+            <input type="hidden" id="edit_shipment_id">
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="external_reference">Broker Reference</label>
+                    <input type="text" id="external_reference" placeholder="Enter broker reference">
+                </div>
+
+                <div class="form-group">
+                    <label for="unit_number">Unit Number</label>
+                    <input type="text" id="unit_number" placeholder="Enter unit number">
+                </div>
+
+                <div class="form-group">
+                    <label for="driver_name">Driver Name</label>
+                    <input type="text" id="driver_name" placeholder="Enter driver name">
+                </div>
+
+                <div class="form-group">
+                    <label for="business_name">Business Name</label>
+                    <input type="text" id="business_name" placeholder="Enter business name">
+                </div>
+
+                <div class="form-group full-row">
+                    <label for="broker_name">Broker Name</label>
+                    <input list="brokerNameSuggestions" type="text" id="broker_name" placeholder="Enter broker name">
+                    <datalist id="brokerNameSuggestions"></datalist>
+                </div>
+
+                <div class="form-group">
+                    <label for="pickup_city">Pickup City</label>
+                    <input type="text" id="pickup_city" placeholder="Enter pickup city">
+                </div>
+
+                <div class="form-group">
+                    <label for="pickup_state">Pickup State / Province</label>
+                    <select id="pickup_state"></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="pickup_date">Pickup Date</label>
+                    <div class="input-with-picker">
+                        <input type="text" id="pickup_date" placeholder="dd/mm/yyyy">
+                        <button id="pickupDatePickerBtn" class="picker-launch-btn" type="button" title="Pick pickup date">◻</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="pickup_time">Pickup Time</label>
+                    <input type="time" id="pickup_time" title="Select pickup time">
+                </div>
+
+                <div class="form-group">
+                    <label for="delivery_city">Delivery City</label>
+                    <input type="text" id="delivery_city" placeholder="Enter delivery city">
+                </div>
+
+                <div class="form-group">
+                    <label for="delivery_state">Delivery State / Province</label>
+                    <select id="delivery_state"></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="delivery_date">Delivery Date</label>
+                    <div class="input-with-picker">
+                        <input type="text" id="delivery_date" placeholder="dd/mm/yyyy">
+                        <button id="deliveryDatePickerBtn" class="picker-launch-btn" type="button" title="Pick delivery date">◻</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="delivery_time">Delivery Time</label>
+                    <input type="time" id="delivery_time" title="Select delivery time">
+                </div>
+
+                <div class="form-group">
+                    <label for="miles">Miles</label>
+                    <input type="number" id="miles" placeholder="Enter miles">
+                </div>
+
+                <div class="form-group">
+                    <label for="broker_price">Broker Price</label>
+                    <input type="number" id="broker_price" placeholder="Enter broker price" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="driver_pay">Driver Pay</label>
+                    <input type="number" id="driver_pay" placeholder="Enter driver pay" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="loads_per_day">Loads per Day</label>
+                    <input type="number" id="loads_per_day" placeholder="Enter loads per day">
+                </div>
+
+                <div class="form-group">
+                    <label for="dispatcher_commission_percent">Commission %</label>
+                    <input type="number" id="dispatcher_commission_percent" placeholder="Enter commission percent">
+                </div>
+
+                <div id="editOnlyShipmentStatus" class="form-group" style="display:none;">
+                    <label for="edit_shipment_status">Shipment Status</label>
+                    <select id="edit_shipment_status">
+                        <option value="created">Created</option>
+                        <option value="picked_up">Picked Up</option>
+                        <option value="in_transit">In Transit</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="tonu">TONU</option>
+                        <option value="canceled">Canceled</option>
+                    </select>
+                </div>
+
+                <div id="editOnlyPaymentStatus" class="form-group" style="display:none;">
+                    <label for="edit_payment_status">Driver Payment Status</label>
+                    <select id="edit_payment_status">
+                        <option value="unpaid">Unpaid</option>
+                        <option value="paid">Paid</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="payment_option">Broker Payment Option</label>
+                    <select id="payment_option">
+                        <option value="">Select payment option</option>
+                        <option value="standard">Standard Payment</option>
+                        <option value="quick_pay">Broker Quick Pay</option>
+                    </select>
+                </div>
+
+                <div class="form-group full-row">
+                    <label for="comments">Comments</label>
+                    <textarea id="comments" placeholder="Enter comments"></textarea>
+                </div>
+            </div>
+
+            <div id="calculatedProfit" class="calculated-box">Profit: $0</div>
+
+            <div class="modal-actions">
+                <div class="modal-actions-left">
+                    <button type="button" class="secondary-btn" onclick="closeModal()">Cancel</button>
+                </div>
+                <div class="modal-actions-right">
+                    <button type="submit" class="login-btn save-small-btn" id="shipmentSubmitBtn">Save</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="shipmentLogsModal" class="modal">
+    <div class="modal-content" style="max-width: 900px !important;">
+        <h2 id="shipmentLogsTitle">Shipment Logs</h2>
+        <p class="modal-subtitle">History of changes for the selected shipment</p>
+
+        <div id="shipmentLogsContainer" class="logs-list">
+            <div class="empty-logs">Loading logs...</div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 16px;">
+            <div class="modal-actions-left">
+                <button type="button" class="secondary-btn" onclick="closeLogsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="datePickerModal" class="modal">
+    <div class="modal-content date-modal-content">
+        <div class="date-modal-header">
+            <div class="date-modal-title" id="dateModalTitle">Select Date</div>
+            <div class="date-modal-nav">
+                <button type="button" id="datePrevMonthBtn" class="date-nav-btn">←</button>
+                <button type="button" id="dateNextMonthBtn" class="date-nav-btn">→</button>
+            </div>
+        </div>
+
+        <div class="panel-subtitle" id="dateCurrentMonthLabel">April 2026</div>
+
+        <div class="date-weekdays">
+            <div class="date-weekday">Mon</div>
+            <div class="date-weekday">Tue</div>
+            <div class="date-weekday">Wed</div>
+            <div class="date-weekday">Thu</div>
+            <div class="date-weekday">Fri</div>
+            <div class="date-weekday">Sat</div>
+            <div class="date-weekday">Sun</div>
+        </div>
+
+        <div class="date-grid" id="dateGrid"></div>
+
+        <div class="date-modal-footer">
+            <button type="button" id="dateClearBtn" class="small-btn">Clear</button>
+            <button type="button" id="dateCloseBtn" class="small-btn">Close</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/shipments.js?v=5"></script>
+
 </body>
 </html>

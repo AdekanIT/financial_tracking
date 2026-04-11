@@ -7,6 +7,22 @@ from services.logging_service import log_shipment_change
 
 
 # =======================================================
+# ROLE CONFIG
+# =======================================================
+FULL_FINANCIAL_ROLES = {"manager", "supervisor", "accounting"}
+LIMITED_FINANCIAL_OWN_ONLY_ROLES = {"dispatcher"}
+NO_FINANCIAL_ROLES = {"hr", "tracking"}
+
+SENSITIVE_FIELDS = [
+    "broker_price",
+    "driver_pay",
+    "profit",
+    "percentage_of_margin",
+    "dispatcher_commission_percent",
+]
+
+
+# =======================================================
 # HELPERS
 # =======================================================
 def validate_company(company_id: int):
@@ -18,7 +34,7 @@ def validate_company(company_id: int):
         company = cursor.fetchone()
 
         if not company:
-            raise HTTPException(404, "Company not found")
+            raise HTTPException(status_code=404, detail="Company not found")
 
         return company
 
@@ -36,10 +52,10 @@ def validate_staff(staff_id: int):
         staff = cursor.fetchone()
 
         if not staff:
-            raise HTTPException(404, "Staff not found")
+            raise HTTPException(status_code=404, detail="Staff not found")
 
         if int(staff["is_active"]) != 1:
-            raise HTTPException(400, "Staff inactive")
+            raise HTTPException(status_code=400, detail="Staff inactive")
 
         return staff
 
@@ -81,12 +97,7 @@ def generate_company_reference(company_id: int):
         conn.close()
 
 
-def check_reference_uniqueness(
-    cursor,
-    shipment_id: int,
-    field_name: str,
-    value: str
-):
+def check_reference_uniqueness(cursor, shipment_id: int, field_name: str, value: str):
     if value is None:
         return
 
@@ -106,6 +117,69 @@ def check_reference_uniqueness(
         )
 
 
+def normalize_job_title(job_title: str) -> str:
+    return (job_title or "").strip().lower()
+
+
+def can_view_all_financials(current_user: dict) -> bool:
+    return normalize_job_title(current_user.get("job_title")) in FULL_FINANCIAL_ROLES
+
+
+def can_view_only_own_financials(current_user: dict) -> bool:
+    return normalize_job_title(current_user.get("job_title")) in LIMITED_FINANCIAL_OWN_ONLY_ROLES
+
+
+def should_hide_financials_for_shipment(current_user: dict, shipment: dict) -> bool:
+    job_title = normalize_job_title(current_user.get("job_title"))
+    current_staff_id = current_user.get("staff_id")
+    assigned_staff_id = shipment.get("assigned_staff_id")
+
+    if job_title in FULL_FINANCIAL_ROLES:
+        return False
+
+    if job_title in LIMITED_FINANCIAL_OWN_ONLY_ROLES:
+        return assigned_staff_id != current_staff_id
+
+    if job_title in NO_FINANCIAL_ROLES:
+        return True
+
+    return True
+
+
+def mask_sensitive_fields(shipment: dict) -> dict:
+    masked = dict(shipment)
+
+    for field in SENSITIVE_FIELDS:
+        if field in masked:
+            masked[field] = None
+
+    return masked
+
+
+def apply_shipment_visibility_rules(shipment: dict, current_user: dict) -> dict:
+    if shipment is None:
+        return None
+
+    if should_hide_financials_for_shipment(current_user, shipment):
+        return mask_sensitive_fields(shipment)
+
+    return shipment
+
+
+def apply_visibility_to_shipments(shipments: list[dict], current_user: dict) -> list[dict]:
+    return [apply_shipment_visibility_rules(shipment, current_user) for shipment in shipments]
+
+
+def fetch_all_non_deleted_shipments(cursor):
+    cursor.execute("""
+        SELECT *
+        FROM shipments
+        WHERE is_deleted = 0
+        ORDER BY shipment_created_date DESC, shipment_id DESC
+    """)
+    return cursor.fetchall()
+
+
 # =======================================================
 # CREATE
 # =======================================================
@@ -118,6 +192,9 @@ def create_shipment(data, staff_id):
         validate_company(company_id)
 
         assigned_staff_id = data.get("assigned_staff_id", staff_id)
+        if assigned_staff_id is None:
+            assigned_staff_id = staff_id
+
         staff = validate_staff(assigned_staff_id)
         staff_full_name = staff["staff_full_name"]
 
@@ -213,52 +290,43 @@ def create_shipment(data, staff_id):
 
 
 # =======================================================
-# GET MY
+# GET VISIBLE LIST
+# Everyone can see all shipments,
+# but financial fields are filtered by role/ownership
+# =======================================================
+def get_visible_shipments_service(current_user):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        shipments = fetch_all_non_deleted_shipments(cursor)
+        return apply_visibility_to_shipments(shipments, current_user)
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# =======================================================
+# LEGACY GET MY
+# Kept for compatibility, but now returns visible shipments
 # =======================================================
 def get_my_shipments_service(current_user):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-
-    try:
-        if current_user["job_title"] == "dispatcher":
-            cursor.execute("""
-                SELECT * FROM shipments
-                WHERE assigned_staff_id = %s AND is_deleted = 0
-            """, (current_user["staff_id"],))
-        else:
-            cursor.execute("""
-                SELECT * FROM shipments
-                WHERE is_deleted = 0
-            """)
-
-        return cursor.fetchall()
-
-    finally:
-        cursor.close()
-        conn.close()
+    return get_visible_shipments_service(current_user)
 
 
 # =======================================================
-# GET ALL
+# LEGACY GET ALL
+# Kept for compatibility, but now returns visible shipments
 # =======================================================
 def get_all_shipments_service(current_user):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-
-    try:
-        cursor.execute("""
-            SELECT * FROM shipments
-            WHERE is_deleted = 0
-        """)
-        return cursor.fetchall()
-
-    finally:
-        cursor.close()
-        conn.close()
+    return get_visible_shipments_service(current_user)
 
 
 # =======================================================
 # GET ONE
+# Everyone can open a shipment,
+# but financial fields are filtered by role/ownership
 # =======================================================
 def get_shipment_by_id(shipment_id, current_user):
     conn = get_connection()
@@ -266,19 +334,17 @@ def get_shipment_by_id(shipment_id, current_user):
 
     try:
         cursor.execute("""
-            SELECT * FROM shipments
+            SELECT *
+            FROM shipments
             WHERE shipment_id = %s
               AND is_deleted = 0
         """, (shipment_id,))
         shipment = cursor.fetchone()
 
         if not shipment:
-            raise HTTPException(404, "Shipment not found")
+            raise HTTPException(status_code=404, detail="Shipment not found")
 
-        if current_user["job_title"] == "dispatcher" and shipment["assigned_staff_id"] != current_user["staff_id"]:
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        return shipment
+        return apply_shipment_visibility_rules(shipment, current_user)
 
     finally:
         cursor.close()
@@ -287,6 +353,8 @@ def get_shipment_by_id(shipment_id, current_user):
 
 # =======================================================
 # UPDATE
+# Dispatcher can update only own shipments
+# Others by existing permission rules from router
 # =======================================================
 def update_shipment_service(shipment_id, data, current_user):
     conn = get_connection()
@@ -294,20 +362,22 @@ def update_shipment_service(shipment_id, data, current_user):
 
     try:
         cursor.execute("""
-            SELECT * FROM shipments
+            SELECT *
+            FROM shipments
             WHERE shipment_id = %s
               AND is_deleted = 0
         """, (shipment_id,))
         shipment = cursor.fetchone()
 
         if not shipment:
-            raise HTTPException(404, "Shipment not found")
+            raise HTTPException(status_code=404, detail="Shipment not found")
 
-        if current_user["job_title"] == "dispatcher" and shipment["assigned_staff_id"] != current_user["staff_id"]:
-            raise HTTPException(status_code=403, detail="Access denied")
+        if normalize_job_title(current_user["job_title"]) == "dispatcher":
+            if shipment["assigned_staff_id"] != current_user["staff_id"]:
+                raise HTTPException(status_code=403, detail="Access denied")
 
         if not data:
-            raise HTTPException(400, "No fields provided")
+            raise HTTPException(status_code=400, detail="No fields provided")
 
         if "company_id" in data and data["company_id"] is not None:
             validate_company(data["company_id"])
@@ -377,14 +447,15 @@ def update_shipment_service(shipment_id, data, current_user):
                 )
 
         cursor.execute("""
-            SELECT * FROM shipments
+            SELECT *
+            FROM shipments
             WHERE shipment_id = %s
         """, (shipment_id,))
         updated_shipment = cursor.fetchone()
 
         return {
             "message": "Shipment updated successfully",
-            "shipment": updated_shipment
+            "shipment": apply_shipment_visibility_rules(updated_shipment, current_user)
         }
 
     finally:
@@ -401,14 +472,15 @@ def delete_shipment_service(shipment_id, current_user):
 
     try:
         cursor.execute("""
-            SELECT * FROM shipments
+            SELECT *
+            FROM shipments
             WHERE shipment_id = %s
               AND is_deleted = 0
         """, (shipment_id,))
         shipment = cursor.fetchone()
 
         if not shipment:
-            raise HTTPException(404, "Shipment not found")
+            raise HTTPException(status_code=404, detail="Shipment not found")
 
         cursor.execute("""
             UPDATE shipments

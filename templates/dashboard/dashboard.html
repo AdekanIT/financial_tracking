@@ -1,32 +1,145 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Financial Tracking System</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
+<body class="dashboard-body">
 
-<div class="layout">
     <aside class="sidebar">
-        <a href="/dashboard">Dashboard</a>
-        <a href="/shipments">Shipments</a>
-        <a href="/salary">Salary</a>
-        <a href="/users">Users</a>
-        <a href="/archive">Archive</a>
-    </aside>
-
-    <main class="content">
-        <div class="cards">
-            <div class="card"><p id="totalProfit"></p></div>
-            <div class="card"><p id="totalShipments"></p></div>
+        <div class="sidebar-top">
+            <h2 class="logo-title">FTMS</h2>
+            <p class="logo-subtitle">Logistics Finance</p>
         </div>
 
-        <canvas id="chart"></canvas>
-    </main>
-</div>
+        <nav class="sidebar-nav">
+            <a href="/dashboard" class="nav-link active">Dashboard</a>
+            <a href="/shipments" class="nav-link">Shipments</a>
+            <a href="/salary" class="nav-link">Salary</a>
+            <a href="/users" class="nav-link">Users</a>
+            <a href="/archive" class="nav-link">Archive</a>
+        </nav>
 
-<script src="/static/js/api.js"></script>
-<script src="/static/js/dashboard.js"></script>
+        <div class="sidebar-bottom">
+            <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+    </aside>
+
+    <main class="dashboard-main">
+        <header class="topbar">
+            <div>
+                <h1 class="page-title" id="dashboardTitle">Dashboard</h1>
+                <p class="page-subtitle" id="dashboardSubtitle">
+                    Logistics financial overview and shipment performance trends
+                </p>
+            </div>
+
+            <div class="topbar-right">
+                <div class="user-badge">
+                    <span id="userName">User</span>
+                </div>
+            </div>
+        </header>
+
+        <section class="summary-grid">
+            <div class="summary-card">
+                <p class="summary-label">Total Profit</p>
+                <h3 class="summary-value" id="totalProfit">$0</h3>
+            </div>
+
+            <div class="summary-card">
+                <p class="summary-label">Total Shipments</p>
+                <h3 class="summary-value" id="totalShipments">0</h3>
+            </div>
+
+            <div class="summary-card">
+                <p class="summary-label">Gross</p>
+                <h3 class="summary-value" id="totalGross">$0</h3>
+            </div>
+
+            <div class="summary-card">
+                <p class="summary-label">Current Period</p>
+                <h3 class="summary-value" id="topDispatcher">—</h3>
+            </div>
+        </section>
+
+        <section class="chart-panel">
+            <div class="chart-panel-header">
+                <div>
+                    <h2>Analytics</h2>
+                    <p>Switch between chart views</p>
+                </div>
+
+                <div class="chart-switcher">
+                    <button class="chart-tab" data-chart="doughnut">Contribution</button>
+                    <button class="chart-tab active" data-chart="line">Trend</button>
+                    <button class="chart-tab" data-chart="bar">Bar</button>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <canvas id="profitChart"></canvas>
+            </div>
+        </section>
+
+        <section class="bottom-grid">
+            <div class="table-card">
+                <div class="card-header">
+                    <h2 id="tableTitle">Breakdown</h2>
+                    <p id="tableSubtitle">Performance details for the latest period</p>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Label</th>
+                                <th>Shipments</th>
+                                <th>Profit</th>
+                                <th>Share</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dispatcherTableBody">
+                            <tr>
+                                <td colspan="5" class="empty-row">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <div class="card-header">
+                    <h2>Dashboard Notes</h2>
+                    <p>Quick overview</p>
+                </div>
+
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-dot"></span>
+                        <p>Doughnut chart shows the latest period contribution breakdown.</p>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-dot"></span>
+                        <p>Line chart shows profit trend by month.</p>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-dot"></span>
+                        <p>Bar chart compares monthly profit values.</p>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-dot"></span>
+                        <p>The visible data depends on your role and permissions.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/js/dashboard.js?v=2"></script>
 </body>
 </html>

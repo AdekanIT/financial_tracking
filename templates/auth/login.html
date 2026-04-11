@@ -1,41 +1,80 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Login</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Financial Tracking System</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
 </head>
-<body>
+<body class="login-body">
 
-<div style="max-width:300px;margin:100px auto;">
-    <h2>Login</h2>
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-left">
+                <div class="brand-box">
+                    <h1 class="brand-title">Financial Tracking</h1>
+                    <h2 class="brand-subtitle">Management System</h2>
+                    <p class="brand-text">
+                        Secure access to the logistics financial platform.
+                        Manage shipments, salaries, users, and company performance
+                        from one centralized system.
+                    </p>
 
-    <input id="username" placeholder="Username"><br><br>
-    <input id="password" type="password" placeholder="Password"><br><br>
+                    <div class="brand-features">
+                        <div class="feature-item">• Shipment Management</div>
+                        <div class="feature-item">• Salary Tracking</div>
+                        <div class="feature-item">• User Role Control</div>
+                        <div class="feature-item">• Financial Analytics</div>
+                    </div>
+                </div>
+            </div>
 
-    <button onclick="login()">Login</button>
-</div>
+            <div class="login-right">
+                <div class="form-box">
+                    <div class="form-header">
+                        <h2>Welcome Back</h2>
+                        <p>Sign in to continue</p>
+                    </div>
 
-<script>
-async function login() {
-    const res = await fetch("http://127.0.0.1:8000/auth/login", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            username: username.value,
-            password: password.value
-        })
-    });
+                    <form id="loginForm" class="login-form">
+                        <div class="input-group">
+                            <label for="username">Username</label>
+                            <input
+                                type="text"
+                                id="username"
+                                name="username"
+                                placeholder="Enter your username"
+                                required
+                            >
+                        </div>
 
-    const data = await res.json();
+                        <div class="input-group">
+                            <label for="password">Password</label>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                placeholder="Enter your password"
+                                required
+                            >
+                        </div>
 
-    if (data.access_token) {
-        localStorage.setItem("token", data.access_token);
-        window.location.href = "/dashboard";
-    } else {
-        alert("Login failed");
-    }
-}
-</script>
+                        <div id="errorMessage" class="error-message"></div>
+                        <div id="successMessage" class="success-message"></div>
 
+                        <button type="submit" class="login-btn" id="loginBtn">
+                            Sign In
+                        </button>
+                    </form>
+
+                    <div class="login-footer">
+                        <p>Financial Tracking and Management System for Logistics Companies</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/auth.js?v=2"></script>
 </body>
 </html>

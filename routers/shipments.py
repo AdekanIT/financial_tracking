@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from services.shipment_service import (
     create_shipment,
+    get_visible_shipments_service,
     get_my_shipments_service,
     get_all_shipments_service,
     get_shipment_by_id,
@@ -79,6 +80,7 @@ class ShipmentDelete(BaseModel):
 
 # =======================================================
 # CREATE
+# manager + supervisor + accounting + dispatcher
 # =======================================================
 @router.post("/create")
 def create_new_shipment(
@@ -89,7 +91,20 @@ def create_new_shipment(
 
 
 # =======================================================
+# VISIBLE LIST
+# all authenticated users can see all shipments,
+# but service masks financial fields by role/ownership
+# =======================================================
+@router.get("/visible")
+def get_visible_shipments(
+    current_user: dict = Depends(get_current_user)
+):
+    return get_visible_shipments_service(current_user)
+
+
+# =======================================================
 # GET MY
+# kept for compatibility
 # =======================================================
 @router.get("/my")
 def get_my_shipments(
@@ -100,10 +115,11 @@ def get_my_shipments(
 
 # =======================================================
 # GET ALL
+# kept for compatibility, now same visible logic
 # =======================================================
 @router.get("/all")
 def get_all_shipments(
-    current_user: dict = Depends(require_roles(["manager", "supervisor", "accounting"]))
+    current_user: dict = Depends(get_current_user)
 ):
     return get_all_shipments_service(current_user)
 
@@ -120,7 +136,9 @@ def get_one_shipment(
 
 
 # =======================================================
-# UPDATE (PARTIAL JSON UPDATE)
+# UPDATE
+# manager + supervisor + accounting + dispatcher
+# dispatcher can update only own shipments in service
 # =======================================================
 @router.put("/update")
 def update_shipment(
@@ -139,6 +157,7 @@ def update_shipment(
 
 # =======================================================
 # DELETE (SOFT)
+# manager + supervisor
 # =======================================================
 @router.put("/delete")
 def delete_shipment(
