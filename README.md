@@ -59,7 +59,9 @@ static/     → JS & CSS assets
 ```
 FinancialTracking/
 ├── data/
-│   └── db.py
+│   ├── db.py
+│   └── datasets/
+│       └── FTMS_full_dump.sql
 ├── routers/
 │   ├── auth.py
 │   ├── users.py
@@ -87,12 +89,67 @@ FinancialTracking/
 │   ├── css/
 │   └── js/
 ├── main.py
+├── .env
 └── requirements.txt
 ```
 
 ---
 
-## 🗄️ Database Schema
+## 🗄️ Database Setup
+
+A full MySQL database dump is included in the project for easy setup and testing.
+
+### Step 1 — Create the Database
+
+```sql
+CREATE DATABASE financial_tracking;
+```
+
+### Step 2 — Import the Dump
+
+The dump file is located at:
+
+```
+data/datasets/FTMS_full_dump.sql
+```
+
+**Option A — MySQL Workbench**
+
+1. Go to **Server → Data Import**
+2. Select **Import from Self-Contained File**
+3. Choose file: `data/datasets/FTMS_full_dump.sql`
+4. Select target schema: `financial_tracking`
+5. Click **Start Import**
+
+**Option B — Command Line**
+
+```bash
+mysql -u root -p financial_tracking < data/datasets/FTMS_full_dump.sql
+```
+
+### What's Included in the Dump
+
+The dump file contains the full database structure (tables, relationships, constraints) for all six core tables — `staff`, `companies`, `shipments`, `salary_records`, `shipment_logs`, and `user_logs` — along with preloaded test data for immediate usage.
+
+### Step 3 — Configure Environment
+
+Create a `.env` file in the project root with your local MySQL credentials:
+
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=financial_tracking
+SECRET_KEY=your_secret_key
+ALGORITHM=HS256
+```
+
+> ⚠️ This database is intended for **development and testing only**. Do not store real credentials in `.env`. Make sure your `.env` matches your local MySQL configuration.
+
+---
+
+## 🗃️ Database Schema
 
 The system uses **6 core tables**:
 
