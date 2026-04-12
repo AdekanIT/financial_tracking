@@ -1,14 +1,16 @@
 # 🚛 Financial Tracking and Management System
 
-A backend system for logistics companies to manage shipments, staff operations, salary records, financial reporting, and analytics — built with **FastAPI** and **MySQL**.
+A full-stack platform for logistics companies to manage shipments, staff operations, salary records, financial reporting, and analytics — built with **FastAPI**, **MySQL**, and **Vanilla JavaScript**.
 
 ---
 
 ## 📌 Overview
 
-The **Financial Tracking and Management System** is a centralized backend platform designed for logistics companies. It covers the full operational cycle from shipment creation to salary payouts and profit analytics, with role-based access control and a complete audit trail.
+The **Financial Tracking and Management System (FTMS)** is a centralized platform designed for logistics companies. It covers the full operational cycle — from shipment creation to salary payouts and profit analytics — with role-based access control, a complete audit trail, and a polished frontend interface.
 
-### Key capabilities
+The system is **functionally complete** and currently in the **testing and final polishing stage**.
+
+### Key Capabilities
 
 - Shipment CRUD with soft delete and financial auto-calculation
 - Dispatcher assignment and commission tracking
@@ -16,6 +18,8 @@ The **Financial Tracking and Management System** is a centralized backend platfo
 - Company profit analytics with period-based breakdowns
 - JWT authentication with role-based access control
 - Full audit logging for shipments and user changes
+- Interactive dashboard with charts and filters
+- Archive module with multi-field search
 
 ---
 
@@ -30,6 +34,8 @@ The **Financial Tracking and Management System** is a centralized backend platfo
 | **bcrypt / passlib** | Password hashing |
 | **Pydantic** | Request/response validation |
 | **OpenPyXL** | Excel export generation |
+| **HTML / CSS / JS** | Frontend interface |
+| **Chart.js** | Dashboard visualizations |
 
 ---
 
@@ -42,6 +48,8 @@ routers/    → API endpoints
 services/   → Business logic
 data/       → Database connection & auth helpers
 utils/      → Shared calculation logic
+templates/  → Frontend pages
+static/     → JS & CSS assets
 ```
 
 ---
@@ -70,7 +78,14 @@ FinancialTracking/
 ├── utils/
 │   └── calculations.py
 ├── templates/
+│   ├── dashboard/
+│   ├── shipments/
+│   ├── salary/
+│   ├── users/
+│   └── archive/
 ├── static/
+│   ├── css/
+│   └── js/
 ├── main.py
 └── requirements.txt
 ```
@@ -108,11 +123,9 @@ staff.staff_id             → user_logs.staff_id / changed_by
 - **Password hashing** via bcrypt
 - **Role-based access** controlled by `job_title`
 
-### Roles
-
 | Role | Access Level |
 |---|---|
-| `manager` | Full backend access |
+| `manager` | Full system access |
 | `supervisor` | Monitoring, analytics |
 | `dispatcher` | Own shipments only |
 | `accounting` | Financial & salary data |
@@ -124,18 +137,17 @@ staff.staff_id             → user_logs.staff_id / changed_by
 ## 🚚 Shipment Module
 
 - Create, update, and soft-delete shipments
-- Auto-calculated field:
+- Internal reference auto-generated
+- Dispatcher assignment with commission tracking
+- Advanced filters, search, and date-based filtering
+- Staff full name stored as snapshot
+- Auto-calculated profit:
 
 ```
 profit = broker_price - driver_pay
 ```
 
-- Internal reference auto-generated
-- Staff full name stored as snapshot
-- Soft delete system:
-  - `is_deleted`
-  - `deleted_at`
-  - `deleted_by`
+- Soft delete system: `is_deleted`, `deleted_at`, `deleted_by`
 
 ---
 
@@ -144,8 +156,8 @@ profit = broker_price - driver_pay
 ### Calculation Logic
 
 ```
-profit     = broker_price - driver_pay
-commission = profit × dispatcher_commission_percent / 100
+profit        = broker_price - driver_pay
+commission    = profit × dispatcher_commission_percent / 100
 
 gross_salary  = base_salary + shipment_bonus + bonus
 tax_amount    = gross_salary × tax_percent / 100
@@ -154,28 +166,28 @@ total_salary  = gross_salary - tax_amount
 
 ### Features
 
-- Salary preview before generation
+- Salary preview (all staff / personal) before generation
 - Official salary record creation
 - Name normalization (`john smith → John Smith`)
 - Duplicate name handling via `staff_id`
-- Excel export with:
-  - Employee Salaries
-  - Company Summary
-- Browser preview for export
+- Excel export with Employee Salaries and Company Summary sheets
+- Browser preview for exported reports
+- Custom popup UI (no browser alerts)
 
 ---
 
 ## 📊 Analytics Module
 
-- Role-based dashboard
-- Profit analytics grouped by:
-  - Day
-  - Week
-  - Month
-- Nested breakdown support
-- Only delivered shipments counted
+Role-based dashboard with profit analytics grouped by day, week, or month. Only delivered shipments are counted.
 
-### Example response
+| Component | Logic |
+|---|---|
+| **Contribution** (donut chart) | Current selected period only |
+| **Trend** (line chart) | Historical performance over time |
+| **Bar** (stacked chart) | Period-to-period comparison |
+| **Staff Breakdown** (table) | Individual staff metrics |
+
+### Example Response
 
 ```json
 {
@@ -197,19 +209,21 @@ total_salary  = gross_salary - tax_amount
 
 ---
 
+## 📦 Archive Module
+
+- Fully frontend-driven filtering (no additional backend endpoints)
+- Uses the existing `/shipments/all` endpoint
+- Multi-field search: company reference, broker reference, broker name, dates
+- Financial summaries per search result
+
+---
+
 ## 📜 Audit Logging
 
-All changes are tracked:
+All changes are tracked automatically:
 
-- **Shipment logs**
-  - creation
-  - updates
-  - status changes
-  - soft delete
-- **User logs**
-  - role changes
-  - status updates
-  - admin/HR actions
+- **Shipment logs** — creation, updates, status changes, soft delete
+- **User logs** — role changes, status updates, admin/HR actions
 
 ---
 
@@ -228,7 +242,7 @@ All changes are tracked:
 | POST | `/users/create` | Create user |
 | POST | `/users/change-password` | Change password |
 | POST | `/users/change-role` | Change role |
-| POST | `/users/change-status` | Toggle status |
+| POST | `/users/change-status` | Toggle active status |
 
 ### Shipments
 
@@ -246,19 +260,30 @@ All changes are tracked:
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/salary/my` | My preview |
-| GET | `/salary/my-record` | My record |
+| GET | `/salary/my-record` | My official record |
 | GET | `/salary/all` | All previews |
-| GET | `/salary/all-records` | All records |
+| GET | `/salary/all-records` | All official records |
 | POST | `/salary/generate` | Generate salary |
 | GET | `/salary/export` | Download Excel |
-| GET | `/salary/export-preview` | Preview |
+| GET | `/salary/export-preview` | Browser preview |
 
 ### Analytics
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/analytics/dashboard` | Dashboard |
+| GET | `/analytics/dashboard` | Dashboard data |
 | GET | `/analytics/company-profit` | Profit analytics |
+
+---
+
+## 🎨 Frontend Highlights
+
+- Unified sidebar navigation across all pages
+- Archive integrated into main navigation
+- Custom modal dialogs (no default browser alerts)
+- Chart animations with smooth transitions
+- Improved UX for date inputs (auto-formatting)
+- Responsive layout
 
 ---
 
@@ -272,18 +297,19 @@ All changes are tracked:
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/FinancialTracking.git
-cd FinancialTracking
+git clone https://github.com/AdekanIT/financial_tracking.git
+cd financial_tracking
 
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-### Swagger UI
+### Access
 
-```
-http://127.0.0.1:8000/docs
-```
+| URL | Description |
+|---|---|
+| `http://127.0.0.1:8000` | Application |
+| `http://127.0.0.1:8000/docs` | Swagger API docs |
 
 ---
 
@@ -291,18 +317,28 @@ http://127.0.0.1:8000/docs
 
 ### Completed
 
-- ✅ Authentication & RBAC
-- ✅ Shipment module
+- ✅ Authentication & role-based access control
+- ✅ Shipment module with soft delete
 - ✅ Salary system + Excel export
-- ✅ Analytics
+- ✅ Analytics dashboard with charts
 - ✅ Audit logging
 - ✅ Database schema
+- ✅ Archive module
+- ✅ Frontend UI
 
 ### In Progress
 
-- 🔧 Frontend (HTML / CSS / JS)
-- 🔧 Charts & filters
-- 🔧 UI export tools
+- 🔧 Bug fixing & edge cases
+- 🔧 UI polishing
+- 🔧 Data validation
+- 🔧 Final testing
+
+### Future Improvements
+
+- Advanced analytics & reporting
+- Mobile responsiveness
+- Notifications system
+- Performance optimization
 
 ---
 
@@ -314,9 +350,15 @@ http://127.0.0.1:8000/docs
 | **Module** | ICE3001 |
 | **Project** | Financial Tracking System |
 | **Type** | Individual Project |
+| **Student** | Dilmurod Yakhshiboev |
+| **Student ID** | B2201051 |
 
 ---
 
 ## 📄 License
 
 This project was developed for academic purposes.
+
+---
+
+🔗 **Repository**: [github.com/AdekanIT/financial_tracking](https://github.com/AdekanIT/financial_tracking)

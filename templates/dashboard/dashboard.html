@@ -4,23 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | Financial Tracking System</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=13">
+    <link rel="stylesheet" href="/static/css/style.css?v=16">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         :root {
             color-scheme: dark;
             --bg-main: #0b1118;
-            --bg-soft: rgba(18, 24, 33, 0.94);
             --bg-card: rgba(18, 24, 33, 0.92);
-            --bg-input: #0d131b;
+            --bg-soft: rgba(255, 255, 255, 0.03);
+            --bg-soft-2: rgba(255, 255, 255, 0.05);
             --text-main: #e5eefb;
             --text-soft: #8ea0b8;
             --text-muted: #94a3b8;
+            --text-bright: #f8fbff;
             --accent: #3b82f6;
             --accent-2: #2563eb;
+            --accent-3: #60a5fa;
             --border-soft: rgba(147, 197, 253, 0.14);
             --border-strong: rgba(120, 170, 255, 0.18);
             --shadow-blue: 0 0 24px rgba(59, 130, 246, 0.10);
+            --shadow-strong: 0 18px 40px rgba(0, 0, 0, 0.28);
+            --glow-blue: 0 0 0 1px rgba(96, 165, 250, 0.10), 0 0 28px rgba(59, 130, 246, 0.10);
         }
 
         html, body {
@@ -60,11 +65,7 @@
             display: none;
         }
 
-        body.sidebar-collapsed .sidebar .nav-link {
-            justify-content: center;
-            padding: 14px 10px;
-        }
-
+        body.sidebar-collapsed .sidebar .nav-link,
         body.sidebar-collapsed .sidebar .logout-btn {
             justify-content: center;
             padding: 14px 10px;
@@ -187,6 +188,7 @@
             align-items: center;
             gap: 10px;
             flex-wrap: wrap;
+            position: relative;
         }
 
         .user-badge {
@@ -200,6 +202,65 @@
             border: 1px solid rgba(147, 197, 253, 0.14);
             color: #dce7f5;
             font-weight: 600;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.02);
+        }
+
+        .top-menu-btn {
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            background: rgba(255, 255, 255, 0.04);
+            color: #dce7f5;
+            border-radius: 12px;
+            height: 42px;
+            width: 42px;
+            min-width: 42px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.18s ease;
+        }
+
+        .top-menu-btn:hover {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(96, 165, 250, 0.35);
+            transform: translateY(-1px);
+        }
+
+        .top-menu-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 220px;
+            background: rgba(18, 24, 33, 0.98);
+            border: 1px solid rgba(120, 170, 255, 0.18);
+            border-radius: 16px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+            padding: 10px;
+            display: none;
+            z-index: 40;
+        }
+
+        .top-menu-dropdown.open {
+            display: block;
+            animation: fadeInPop 0.18s ease;
+        }
+
+        .top-menu-item {
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: #dce7f5;
+            text-align: left;
+            padding: 11px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: 0.18s ease;
+        }
+
+        .top-menu-item:hover {
+            background: rgba(59, 130, 246, 0.10);
         }
 
         .summary-grid {
@@ -212,15 +273,38 @@
         .summary-card,
         .chart-panel,
         .table-card,
+        .legend-card,
         .notes-card {
             background: rgba(18, 24, 33, 0.92);
             border: 1px solid rgba(120, 170, 255, 0.18);
             border-radius: 18px;
-            box-shadow: 0 0 24px rgba(59, 130, 246, 0.10);
+            box-shadow: var(--shadow-blue);
+            transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+        }
+
+        .summary-card:hover,
+        .table-card:hover,
+        .legend-card:hover,
+        .notes-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(96, 165, 250, 0.28);
+            box-shadow: var(--glow-blue), var(--shadow-strong);
         }
 
         .summary-card {
             padding: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .summary-card::after {
+            content: "";
+            position: absolute;
+            inset: auto -20% -55% auto;
+            width: 120px;
+            height: 120px;
+            background: radial-gradient(circle, rgba(59,130,246,0.12), transparent 68%);
+            pointer-events: none;
         }
 
         .summary-label {
@@ -228,6 +312,8 @@
             font-size: 12px;
             color: #8ea0b8;
             font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }
 
         .summary-value {
@@ -235,16 +321,30 @@
             font-size: 24px;
             color: #f8fbff;
             font-weight: 800;
+            line-height: 1.2;
         }
 
         .chart-panel,
         .table-card,
+        .legend-card,
         .notes-card {
             padding: 16px;
         }
 
         .chart-panel {
             margin-bottom: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-panel::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at top right, rgba(59,130,246,0.08), transparent 30%),
+                linear-gradient(180deg, rgba(255,255,255,0.015), transparent 45%);
+            pointer-events: none;
         }
 
         .chart-panel-header,
@@ -253,7 +353,9 @@
             justify-content: space-between;
             align-items: flex-start;
             gap: 12px;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
+            position: relative;
+            z-index: 1;
         }
 
         .chart-panel-header h2,
@@ -268,31 +370,90 @@
             margin: 0;
             color: #8ea0b8;
             font-size: 12px;
+            line-height: 1.55;
         }
 
-        .chart-switcher {
+        .controls-wrap {
             display: flex;
-            gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            justify-content: flex-end;
         }
 
-        .chart-tab {
-            border: 1px solid rgba(147, 197, 253, 0.16);
+        .control-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px;
             background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(147, 197, 253, 0.12);
+            border-radius: 14px;
+            backdrop-filter: blur(6px);
+        }
+
+        .control-btn {
+            border: 1px solid transparent;
+            background: transparent;
             color: #dce7f5;
-            padding: 10px 14px;
-            border-radius: 10px;
+            padding: 9px 14px;
+            border-radius: 11px;
             cursor: pointer;
-            transition: 0.2s ease;
+            transition: 0.22s ease;
             font-weight: 700;
             font-size: 12px;
+            position: relative;
+            overflow: hidden;
         }
 
-        .chart-tab:hover,
-        .chart-tab.active {
-            background: rgba(59, 130, 246, 0.16);
+        .control-btn::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(59,130,246,0.10), rgba(96,165,250,0.05));
+            opacity: 0;
+            transition: opacity 0.22s ease;
+            pointer-events: none;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-1px);
+            color: white;
+        }
+
+        .control-btn:hover::after {
+            opacity: 1;
+        }
+
+        .control-btn.active {
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
             color: white;
             border-color: rgba(96, 165, 250, 0.34);
+            box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+        }
+
+        .control-btn.active::after {
+            opacity: 0;
+        }
+
+        .chart-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) 360px;
+            gap: 16px;
+            align-items: stretch;
+            position: relative;
+            z-index: 1;
+        }
+
+        .chart-canvas-card {
+            min-height: 420px;
+            position: relative;
+            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+            border: 1px solid rgba(147, 197, 253, 0.10);
+            border-radius: 18px;
+            padding: 12px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+            animation: fadeInSoft 0.35s ease;
         }
 
         .chart-card {
@@ -300,10 +461,132 @@
             position: relative;
         }
 
+        .legend-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 420px;
+            animation: fadeInSoft 0.38s ease;
+        }
+
+        .legend-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.10);
+            border: 1px solid rgba(96, 165, 250, 0.18);
+            color: #dbeafe;
+            font-size: 11px;
+            font-weight: 700;
+            width: fit-content;
+        }
+
+        .legend-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 8px;
+            max-height: 322px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .legend-empty {
+            color: #94a3b8;
+            font-size: 13px;
+            padding: 18px 0;
+        }
+
+        .legend-item {
+            display: grid;
+            grid-template-columns: 16px minmax(0, 1fr);
+            gap: 10px;
+            align-items: flex-start;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 14px;
+            border: 1px solid rgba(147, 197, 253, 0.10);
+            transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+            animation: fadeInSlide 0.24s ease;
+        }
+
+        .legend-item:hover {
+            transform: translateY(-2px);
+            border-color: rgba(96, 165, 250, 0.24);
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-top: 3px;
+            box-shadow: 0 0 10px rgba(255,255,255,0.12);
+        }
+
+        .legend-main {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: flex-start;
+            margin-bottom: 6px;
+        }
+
+        .legend-name {
+            color: #f8fbff;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .legend-profit {
+            color: #dce7f5;
+            font-size: 13px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .legend-sub {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+            color: #8ea0b8;
+            font-size: 12px;
+        }
+
+        .legend-total-box {
+            margin-top: auto;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .legend-total-box .big-total {
+            font-size: 28px;
+            font-weight: 800;
+            color: #f8fbff;
+            line-height: 1.15;
+        }
+
+        .legend-total-box .small-total {
+            color: #8ea0b8;
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
         .bottom-grid {
             display: grid;
-            grid-template-columns: 1.5fr 1fr;
+            grid-template-columns: 1.45fr 1fr;
             gap: 16px;
+        }
+
+        .table-card,
+        .notes-card {
+            animation: fadeInSoft 0.32s ease;
         }
 
         .table-wrapper {
@@ -360,6 +643,14 @@
             padding: 28px 16px !important;
         }
 
+        .notes-card {
+            display: block;
+        }
+
+        .notes-card.hidden {
+            display: none;
+        }
+
         .info-list {
             display: flex;
             flex-direction: column;
@@ -375,6 +666,14 @@
             background: rgba(255, 255, 255, 0.03);
             border-radius: 14px;
             border: 1px solid rgba(147, 197, 253, 0.10);
+            transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+            animation: fadeInSlide 0.24s ease;
+        }
+
+        .info-item:hover {
+            transform: translateY(-2px);
+            border-color: rgba(96, 165, 250, 0.22);
+            background: rgba(59,130,246,0.05);
         }
 
         .info-dot {
@@ -384,6 +683,7 @@
             border-radius: 50%;
             background: linear-gradient(90deg, #3b82f6, #a5f3fc);
             flex-shrink: 0;
+            box-shadow: 0 0 10px rgba(59,130,246,0.22);
         }
 
         .info-item p {
@@ -391,6 +691,49 @@
             font-size: 12px;
             line-height: 1.6;
             margin: 0;
+        }
+
+        @keyframes fadeInSoft {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInSlide {
+            from {
+                opacity: 0;
+                transform: translateY(8px) scale(0.99);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes fadeInPop {
+            from {
+                opacity: 0;
+                transform: translateY(6px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @media (max-width: 1400px) {
+            .chart-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .legend-card {
+                min-height: auto;
+            }
         }
 
         @media (max-width: 1200px) {
@@ -408,9 +751,14 @@
                 flex-direction: column;
             }
 
-            .chart-panel-header {
+            .chart-panel-header,
+            .card-header {
                 flex-direction: column;
                 align-items: flex-start;
+            }
+
+            .controls-wrap {
+                justify-content: flex-start;
             }
         }
 
@@ -421,6 +769,11 @@
 
             .chart-card {
                 height: 320px;
+            }
+
+            .top-menu-dropdown {
+                right: auto;
+                left: 0;
             }
         }
     </style>
@@ -469,6 +822,12 @@
 
     <symbol id="icon-menu-close" viewBox="0 0 24 24">
         <path d="M9 6L15 12L9 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <symbol id="icon-more" viewBox="0 0 24 24">
+        <circle cx="5" cy="12" r="1.8" fill="currentColor"></circle>
+        <circle cx="12" cy="12" r="1.8" fill="currentColor"></circle>
+        <circle cx="19" cy="12" r="1.8" fill="currentColor"></circle>
     </symbol>
 </svg>
 
@@ -537,13 +896,22 @@
         <div>
             <h1 class="page-title" id="dashboardTitle">Dashboard</h1>
             <p class="page-subtitle" id="dashboardSubtitle">
-                Logistics financial overview and shipment performance trends
+                Company shipment analytics, staff contribution and profit trend
             </p>
         </div>
 
         <div class="dashboard-page-top-right">
             <div class="user-badge">
                 <span id="userName">User</span>
+            </div>
+
+            <button id="topMenuBtn" class="top-menu-btn" type="button" aria-label="Open dashboard options">
+                <svg class="icon-svg"><use href="#icon-more"></use></svg>
+            </button>
+
+            <div id="topMenuDropdown" class="top-menu-dropdown">
+                <button id="toggleNotesBtn" class="top-menu-item" type="button">Hide dashboard notes</button>
+                <button id="refreshDashboardBtn" class="top-menu-item" type="button">Refresh dashboard</button>
             </div>
         </div>
     </div>
@@ -565,7 +933,7 @@
         </div>
 
         <div class="summary-card">
-            <p class="summary-label">Current Period</p>
+            <p class="summary-label">Selected Period</p>
             <p class="summary-value" id="topDispatcher">—</p>
         </div>
     </section>
@@ -574,18 +942,52 @@
         <div class="chart-panel-header">
             <div>
                 <h2>Analytics</h2>
-                <p>Switch between chart views</p>
+                <p id="analyticsSubtitle">
+                    Contribution shows the current selected period. Trend and Bar compare performance over time.
+                </p>
             </div>
 
-            <div class="chart-switcher">
-                <button class="chart-tab" data-chart="doughnut">Contribution</button>
-                <button class="chart-tab active" data-chart="line">Trend</button>
-                <button class="chart-tab" data-chart="bar">Bar</button>
+            <div class="controls-wrap">
+                <div class="control-group" id="periodTabs">
+                    <button class="control-btn active" data-period="month" type="button">Month</button>
+                    <button class="control-btn" data-period="week" type="button">Week</button>
+                    <button class="control-btn" data-period="day" type="button">Day</button>
+                </div>
+
+                <div class="control-group" id="chartTabs">
+                    <button class="control-btn active" data-chart="doughnut" type="button">Contribution</button>
+                    <button class="control-btn" data-chart="line" type="button">Trend</button>
+                    <button class="control-btn" data-chart="bar" type="button">Bar</button>
+                </div>
             </div>
         </div>
 
-        <div class="chart-card">
-            <canvas id="profitChart"></canvas>
+        <div class="chart-layout">
+            <div class="chart-canvas-card">
+                <div class="chart-card">
+                    <canvas id="profitChart"></canvas>
+                </div>
+            </div>
+
+            <aside class="legend-card">
+                <div class="card-header">
+                    <div>
+                        <h2 id="legendTitle">Contributions</h2>
+                        <p id="legendSubtitle">Current selected period staff contribution</p>
+                        <div class="legend-badge">Current Period Only</div>
+                    </div>
+                </div>
+
+                <div id="legendList" class="legend-list">
+                    <div class="legend-empty">Legend data will appear here.</div>
+                </div>
+
+                <div class="legend-total-box">
+                    <div class="small-total">Company total profit</div>
+                    <div class="big-total" id="legendTotalProfit">$0</div>
+                    <div class="small-total" id="legendTotalPeriodLabel">Selected period</div>
+                </div>
+            </aside>
         </div>
     </section>
 
@@ -593,8 +995,8 @@
         <div class="table-card">
             <div class="card-header">
                 <div>
-                    <h2 id="tableTitle">Breakdown</h2>
-                    <p id="tableSubtitle">Performance details for the latest period</p>
+                    <h2 id="tableTitle">Staff Breakdown</h2>
+                    <p id="tableSubtitle">Staff contribution breakdown for the selected period</p>
                 </div>
             </div>
 
@@ -603,7 +1005,7 @@
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>Label</th>
+                            <th id="thLabel">Staff</th>
                             <th>Shipments</th>
                             <th>Profit</th>
                             <th>Share</th>
@@ -618,7 +1020,7 @@
             </div>
         </div>
 
-        <div class="notes-card">
+        <div class="notes-card" id="notesCard">
             <div class="card-header">
                 <div>
                     <h2>Dashboard Notes</h2>
@@ -626,28 +1028,28 @@
                 </div>
             </div>
 
-            <div class="info-list">
+            <div class="info-list" id="notesList">
                 <div class="info-item">
                     <span class="info-dot"></span>
-                    <p>Doughnut chart shows the latest period contribution breakdown.</p>
+                    <p><strong>Contribution</strong> always shows only the current selected day, week, or month.</p>
                 </div>
                 <div class="info-item">
                     <span class="info-dot"></span>
-                    <p>Line chart shows profit trend by month.</p>
+                    <p><strong>Trend</strong> shows company and staff profit movement across visible periods.</p>
                 </div>
                 <div class="info-item">
                     <span class="info-dot"></span>
-                    <p>Bar chart compares monthly profit values.</p>
+                    <p><strong>Bar</strong> compares stacked staff contributions across periods.</p>
                 </div>
                 <div class="info-item">
                     <span class="info-dot"></span>
-                    <p>The visible data depends on your role and permissions.</p>
+                    <p>Managers see company-wide data. Dispatchers should only see their own analytics.</p>
                 </div>
             </div>
         </div>
     </section>
 </main>
 
-<script src="/static/js/dashboard.js?v=13"></script>
+<script src="/static/js/dashboard.js?v=16"></script>
 </body>
 </html>

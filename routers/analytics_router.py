@@ -1,10 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from data.db import get_current_user, require_roles
-from services.analytics_service import (
-    build_dashboard,
-    company_profit
-)
+from services.analytics_service import build_dashboard, company_profit
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 

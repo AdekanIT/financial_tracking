@@ -51,6 +51,11 @@ let isGeneratingSalary = false;
 let currentSortKey = null;
 let currentSortDirection = "asc";
 
+let customNoticeModal = null;
+let customNoticeTitle = null;
+let customNoticeMessage = null;
+let customNoticeConfirmBtn = null;
+
 const SELECT_OPTIONS = {
     salaryViewMode: [
         { value: "preview_all", label: "Preview All" },
@@ -167,6 +172,135 @@ function setResultInfo(text) {
     }
 }
 
+function ensureNoticeModal() {
+    if (customNoticeModal) return;
+
+    const style = document.createElement("style");
+    style.textContent = `
+        .custom-notice-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(2, 6, 23, 0.72);
+            backdrop-filter: blur(6px);
+            padding: 16px;
+        }
+
+        .custom-notice-modal.show {
+            display: flex;
+        }
+
+        .custom-notice-card {
+            width: 100%;
+            max-width: 420px;
+            background: rgba(15, 23, 34, 0.98);
+            border: 1px solid rgba(120, 170, 255, 0.18);
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.42);
+            padding: 18px;
+        }
+
+        .custom-notice-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .custom-notice-title {
+            margin: 0;
+            color: #f8fbff;
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .custom-notice-close {
+            width: 36px;
+            height: 36px;
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.03);
+            color: #dce7f5;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .custom-notice-close:hover {
+            background: rgba(59, 130, 246, 0.12);
+        }
+
+        .custom-notice-message {
+            color: #cbd5e1;
+            font-size: 13px;
+            line-height: 1.65;
+            margin: 0 0 16px 0;
+            white-space: pre-wrap;
+        }
+
+        .custom-notice-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .custom-notice-confirm {
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 12px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: white;
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+        }
+    `;
+    document.head.appendChild(style);
+
+    customNoticeModal = document.createElement("div");
+    customNoticeModal.className = "custom-notice-modal";
+    customNoticeModal.innerHTML = `
+        <div class="custom-notice-card" onclick="event.stopPropagation()">
+            <div class="custom-notice-head">
+                <h3 class="custom-notice-title">Notice</h3>
+                <button type="button" class="custom-notice-close">✕</button>
+            </div>
+            <p class="custom-notice-message"></p>
+            <div class="custom-notice-actions">
+                <button type="button" class="custom-notice-confirm">OK</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(customNoticeModal);
+
+    customNoticeTitle = customNoticeModal.querySelector(".custom-notice-title");
+    customNoticeMessage = customNoticeModal.querySelector(".custom-notice-message");
+    customNoticeConfirmBtn = customNoticeModal.querySelector(".custom-notice-confirm");
+    const closeBtn = customNoticeModal.querySelector(".custom-notice-close");
+
+    const closeModal = () => {
+        customNoticeModal.classList.remove("show");
+    };
+
+    customNoticeModal.addEventListener("click", (e) => {
+        if (e.target === customNoticeModal) closeModal();
+    });
+
+    closeBtn.addEventListener("click", closeModal);
+    customNoticeConfirmBtn.addEventListener("click", closeModal);
+}
+
+function showNotice(message, title = "Notice") {
+    ensureNoticeModal();
+    if (customNoticeTitle) customNoticeTitle.textContent = title;
+    if (customNoticeMessage) customNoticeMessage.textContent = message || "";
+    customNoticeModal.classList.add("show");
+}
+
 function formatDateToSlash(value) {
     if (!value) return "";
     const date = value instanceof Date ? value : new Date(value);
@@ -216,20 +350,57 @@ function slashDateToIso(value) {
 function normalizeDateTyping(input) {
     if (!input) return;
 
-    input.addEventListener("input", () => {
-        const digits = input.value.replace(/\D/g, "").slice(0, 8);
+    let isFormatting = false;
 
-        let formatted = "";
-        if (digits.length <= 2) {
-            formatted = digits;
-        } else if (digits.length <= 4) {
-            formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-        } else {
-            formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
-        }
+    function buildMaskedValue(rawValue) {
+        const digits = String(rawValue || "").replace(/\D/g, "").slice(0, 8);
 
-        input.value = formatted;
+        let result = "";
+        if (digits.length > 0) result += digits.slice(0, 2);
+        if (digits.length >= 3) result += "/" + digits.slice(2, 4);
+        if (digits.length >= 5) result += "/" + digits.slice(4, 8);
+
+        return result;
+    }
+
+    function formatCurrentValue() {
+        if (isFormatting) return;
+        isFormatting = true;
+
+        const start = input.selectionStart ?? input.value.length;
+        const before = input.value;
+        const digitsBeforeCursor = before.slice(0, start).replace(/\D/g, "").length;
+
+        const masked = buildMaskedValue(before);
+        input.value = masked;
+
+        let nextCursor = digitsBeforeCursor;
+        if (digitsBeforeCursor >= 3) nextCursor += 1;
+        if (digitsBeforeCursor >= 5) nextCursor += 1;
+
+        const safeCursor = Math.min(nextCursor, input.value.length);
+
+        requestAnimationFrame(() => {
+            try {
+                input.setSelectionRange(safeCursor, safeCursor);
+            } catch (_) {}
+        });
+
         input.classList.remove("field-error");
+        isFormatting = false;
+    }
+
+    input.addEventListener("input", formatCurrentValue);
+
+    input.addEventListener("keydown", (e) => {
+        if (e.key === " " || e.key === "." || e.key === "-") {
+            e.preventDefault();
+            formatCurrentValue();
+        }
+    });
+
+    input.addEventListener("paste", () => {
+        requestAnimationFrame(formatCurrentValue);
     });
 
     input.addEventListener("blur", () => {
@@ -348,7 +519,7 @@ function applyRoleBasedUI() {
     }
 
     if (salaryTableTypeField) {
-        // kept for compatibility if added later
+        // compatibility placeholder
     }
 }
 
@@ -702,7 +873,7 @@ function closeSelectModal() {
 async function loadPreviewData(rangeOverride = null, forceMine = false) {
     const range = rangeOverride || getCheckRange();
     if (range.error) {
-        alert(range.error);
+        showNotice(range.error, "Date Required");
         return;
     }
 
@@ -726,6 +897,7 @@ async function loadPreviewData(rangeOverride = null, forceMine = false) {
         const message = await parseErrorResponse(response, "Failed to load salary preview.");
         showTableError(message);
         setStatus("Error");
+        showNotice(message, "Preview Error");
         return;
     }
 
@@ -738,7 +910,7 @@ async function loadPreviewData(rangeOverride = null, forceMine = false) {
 async function loadSavedRecords(rangeOverride = null, forceMine = false) {
     const range = rangeOverride || getCheckRange();
     if (range.error) {
-        alert(range.error);
+        showNotice(range.error, "Date Required");
         return;
     }
 
@@ -762,6 +934,7 @@ async function loadSavedRecords(rangeOverride = null, forceMine = false) {
         const message = await parseErrorResponse(response, "Failed to load saved salary records.");
         showTableError(message);
         setStatus("Error");
+        showNotice(message, "Records Error");
         return;
     }
 
@@ -799,7 +972,7 @@ async function runDispatcherView() {
 
     const range = getDispatcherRange();
     if (range.error) {
-        alert(range.error);
+        showNotice(range.error, "Date Required");
         return;
     }
 
@@ -846,7 +1019,7 @@ async function previewGenerateSalary() {
 
     const built = buildGeneratePayloadFromForm();
     if (built.error) {
-        alert(built.error);
+        showNotice(built.error, "Missing Data");
         return;
     }
 
@@ -871,6 +1044,7 @@ async function previewGenerateSalary() {
         const message = await parseErrorResponse(response, "Failed to load salary preview.");
         showTableError(message);
         setStatus("Error");
+        showNotice(message, "Preview Error");
         return;
     }
 
@@ -891,7 +1065,7 @@ async function previewGenerateSalary() {
 
 async function generateSalary() {
     if (!isManagerRole()) {
-        alert("Only manager or accounting roles can generate official salary records.");
+        showNotice("Only manager or accounting roles can generate official salary records.", "Access Denied");
         return;
     }
 
@@ -899,7 +1073,7 @@ async function generateSalary() {
 
     const built = buildGeneratePayloadFromForm();
     if (built.error) {
-        alert(built.error);
+        showNotice(built.error, "Missing Data");
         return;
     }
 
@@ -924,13 +1098,13 @@ async function generateSalary() {
 
         if (!response.ok) {
             const message = await parseErrorResponse(response, "Failed to generate salary record.");
-            alert(message);
+            showNotice(message, "Generation Error");
             setStatus("Generation failed");
             return;
         }
 
         const data = await response.json();
-        alert(data.message || "Salary record created successfully.");
+        showNotice(data.message || "Salary record created successfully.", "Success");
         setStatus("Salary generated");
 
         setSelectValue("salaryViewMode", "records_all");
@@ -938,7 +1112,7 @@ async function generateSalary() {
 
     } catch (err) {
         console.error("Generate salary error:", err);
-        alert("Server error while generating salary record.");
+        showNotice("Server error while generating salary record.", "Server Error");
         setStatus("Generation failed");
     } finally {
         isGeneratingSalary = false;
@@ -955,12 +1129,11 @@ async function openExportPreview() {
 
     const range = getCheckRange();
     if (range.error) {
-        alert(range.error);
+        showNotice(range.error, "Date Required");
         return;
     }
 
     setStatus("Opening export preview...");
-
     const qs = getQueryString(range);
     window.location.href = `/excel?${qs}`;
 }
@@ -970,7 +1143,7 @@ async function downloadExcel() {
 
     const range = getCheckRange();
     if (range.error) {
-        alert(range.error);
+        showNotice(range.error, "Date Required");
         return;
     }
 
@@ -988,7 +1161,7 @@ async function downloadExcel() {
 
     if (!response.ok) {
         const message = await parseErrorResponse(response, "Failed to download Excel.");
-        alert(message);
+        showNotice(message, "Download Error");
         setStatus("Download failed");
         return;
     }
@@ -1159,7 +1332,6 @@ function renderDatePickerGrid() {
 
             input.value = formatDateToSlash(currentDate);
             input.classList.remove("field-error");
-
             closeDatePickerModal();
         });
 
@@ -1242,6 +1414,7 @@ function cacheElements() {
     salaryTableTitle = document.getElementById("salaryTableTitle");
     salaryTableSubtitle = document.getElementById("salaryTableSubtitle");
     salaryTableBody = document.getElementById("salaryTableBody");
+
     summaryTotalRecords = document.getElementById("summaryTotalRecords");
     summaryTotalGross = document.getElementById("summaryTotalGross");
     summaryTotalTax = document.getElementById("summaryTotalTax");
@@ -1270,23 +1443,21 @@ function bindDateInputs() {
         dispatcherEndDateInput,
         generateStartDateInput,
         generateEndDateInput
-    ].forEach(normalizeDateTyping);
+    ].forEach((input) => normalizeDateTyping(input));
 }
 
 function bindDatePickerButtons() {
-    const bindings = [
-        ["salaryStartDatePickerBtn", "salaryStartDate", "Select Start Date"],
-        ["salaryEndDatePickerBtn", "salaryEndDate", "Select End Date"],
-        ["dispatcherStartDatePickerBtn", "dispatcherStartDate", "Select Start Date"],
-        ["dispatcherEndDatePickerBtn", "dispatcherEndDate", "Select End Date"],
-        ["generateStartDatePickerBtn", "generateStartDate", "Select Start Date"],
-        ["generateEndDatePickerBtn", "generateEndDate", "Select End Date"]
+    const mapping = [
+        [salaryStartDatePickerBtn, "salaryStartDate", "Select Start Date"],
+        [salaryEndDatePickerBtn, "salaryEndDate", "Select End Date"],
+        [dispatcherStartDatePickerBtn, "dispatcherStartDate", "Select Start Date"],
+        [dispatcherEndDatePickerBtn, "dispatcherEndDate", "Select End Date"],
+        [generateStartDatePickerBtn, "generateStartDate", "Select Start Date"],
+        [generateEndDatePickerBtn, "generateEndDate", "Select End Date"]
     ];
 
-    bindings.forEach(([btnId, inputId, title]) => {
-        const btn = document.getElementById(btnId);
+    mapping.forEach(([btn, inputId, title]) => {
         if (!btn) return;
-
         btn.addEventListener("click", (e) => {
             e.stopPropagation();
             openDatePickerFor(inputId, title);
@@ -1482,6 +1653,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bindDateModal();
     bindSelectModal();
     bindSorting();
+    ensureNoticeModal();
 
     setSalaryLabels();
     applyRoleBasedUI();

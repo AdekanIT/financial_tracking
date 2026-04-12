@@ -43,63 +43,11 @@ let formatOptionButtons = [];
 
 let floatingActionMenu;
 let floatingActionMenuOpen = false;
-// ===== ДОБАВЛЕНО =====
+
 let confirmDeleteShipmentModal;
 let cancelDeleteShipmentBtn;
 let confirmDeleteShipmentBtn;
 let pendingDeleteShipmentId = null;
-
-// ===== ДОБАВЛЕНО =====
-function openDeleteShipmentModal(id) {
-    pendingDeleteShipmentId = id;
-    confirmDeleteShipmentModal.style.display = "flex";
-}
-
-function closeDeleteShipmentModal() {
-    pendingDeleteShipmentId = null;
-    confirmDeleteShipmentModal.style.display = "none";
-}
-
-async function executeDeleteShipment() {
-    if (!pendingDeleteShipmentId) return;
-
-    try {
-        await fetchWithAuth(`${API_BASE_URL}/shipments/delete/${pendingDeleteShipmentId}`, {
-            method: "DELETE"
-        });
-
-        closeDeleteShipmentModal();
-        await loadShipments();
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-// ===== ЗАМЕНА СТАРОГО DELETE =====
-async function deleteShipment(shipmentId) {
-    openDeleteShipmentModal(shipmentId);
-}
-
-// ===== В DOMContentLoaded ДОБАВЬ =====
-confirmDeleteShipmentModal = document.getElementById("confirmDeleteShipmentModal");
-cancelDeleteShipmentBtn = document.getElementById("cancelDeleteShipmentBtn");
-confirmDeleteShipmentBtn = document.getElementById("confirmDeleteShipmentBtn");
-
-if (cancelDeleteShipmentBtn) {
-    cancelDeleteShipmentBtn.addEventListener("click", closeDeleteShipmentModal);
-}
-
-if (confirmDeleteShipmentBtn) {
-    confirmDeleteShipmentBtn.addEventListener("click", executeDeleteShipment);
-}
-
-if (confirmDeleteShipmentModal) {
-    confirmDeleteShipmentModal.addEventListener("click", (e) => {
-        if (e.target === confirmDeleteShipmentModal) {
-            closeDeleteShipmentModal();
-        }
-    });
-}
 
 let isCreating = false;
 let draggedColumnKey = null;
@@ -176,6 +124,16 @@ const MONTH_NAMES_SHORT = [
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
+const STATUS_CLASS_MAP = {
+    created: "status-created",
+    picked_up: "status-picked_up",
+    in_transit: "status-in_transit",
+    delivered: "status-delivered",
+    tonu: "status-tonu",
+    canceled: "status-canceled",
+    cancelled: "status-canceled"
+};
+
 let currentColumns = loadColumnsFromStorage();
 
 function getToken() {
@@ -229,7 +187,7 @@ async function fetchWithAuth(url, options = {}) {
             ...options,
             headers: {
                 ...(options.headers || {}),
-                "Authorization": `Bearer ${token}`,
+                Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json"
             }
         });
@@ -266,98 +224,12 @@ function getTimeFormatLabel(value) {
 function syncTimeFormatUI() {
     const format = getTimeFormat();
 
-    if (timeFormatSelect) {
-        timeFormatSelect.value = format;
-    }
-
-    if (timeFormatDisplay) {
-        timeFormatDisplay.value = getTimeFormatLabel(format);
-    }
+    if (timeFormatSelect) timeFormatSelect.value = format;
+    if (timeFormatDisplay) timeFormatDisplay.value = getTimeFormatLabel(format);
 
     formatOptionButtons.forEach(btn => {
         btn.classList.toggle("active", btn.dataset.formatValue === format);
     });
-}
-
-function openCreateModal() {
-    resetShipmentForm();
-    document.getElementById("edit_shipment_id").value = "";
-    shipmentModalTitle.textContent = "Create Shipment";
-    shipmentSubmitBtn.textContent = "Save";
-    shipmentSubmitBtn.disabled = false;
-    editOnlyShipmentStatus.style.display = "none";
-    editOnlyPaymentStatus.style.display = "none";
-    openModal();
-}
-
-function openModal() {
-    if (shipmentModal) shipmentModal.style.display = "flex";
-}
-
-function closeModal() {
-    if (shipmentModal) shipmentModal.style.display = "none";
-}
-
-function openLogsModal() {
-    if (shipmentLogsModal) shipmentLogsModal.style.display = "flex";
-}
-
-function closeLogsModal() {
-    if (shipmentLogsModal) shipmentLogsModal.style.display = "none";
-}
-
-window.openModal = openModal;
-window.closeModal = closeModal;
-window.openCreateModal = openCreateModal;
-window.closeLogsModal = closeLogsModal;
-
-function calculateProfit() {
-    if (!brokerPriceInput || !driverPayInput || !calculatedProfitBox) return;
-
-    const broker = Number(brokerPriceInput.value) || 0;
-    const driver = Number(driverPayInput.value) || 0;
-    const profit = broker - driver;
-
-    calculatedProfitBox.textContent = `Profit: $${profit.toLocaleString()}`;
-}
-
-const STATUS_CLASS_MAP = {
-    created: "status-created",
-    picked_up: "status-picked_up",
-    in_transit: "status-in_transit",
-    delivered: "status-delivered",
-    tonu: "status-tonu",
-    canceled: "status-canceled",
-    cancelled: "status-canceled"
-};
-
-function getStatusClass(status) {
-    const key = (status || "").toLowerCase();
-    const modifier = STATUS_CLASS_MAP[key] || "status-created";
-    return `shipment-status ${modifier}`;
-}
-
-function createTextCell(text, extraClass = "") {
-    const td = document.createElement("td");
-    if (extraClass) td.className = extraClass;
-    td.textContent = text ?? "—";
-    td.title = text ?? "—";
-    return td;
-}
-
-function createHtmlCell(node, extraClass = "") {
-    const td = document.createElement("td");
-    if (extraClass) td.className = extraClass;
-    td.appendChild(node);
-    return td;
-}
-
-function createMaskedFinanceCell() {
-    const td = document.createElement("td");
-    td.className = "masked-finance";
-    td.textContent = "Hidden";
-    td.title = "Visible only to owner or privileged roles";
-    return td;
 }
 
 function formatCurrencyOrDash(value) {
@@ -434,6 +306,98 @@ function slashDateToIso(value) {
     return `${year}-${month}-${day}`;
 }
 
+function normalizeDateTyping(input, onValidChange = null) {
+    if (!input) return;
+
+    let isFormatting = false;
+
+    function buildMaskedValue(rawValue) {
+        const digits = String(rawValue || "").replace(/\D/g, "").slice(0, 8);
+
+        let result = "";
+        if (digits.length > 0) result += digits.slice(0, 2);
+        if (digits.length >= 3) result += "/" + digits.slice(2, 4);
+        if (digits.length >= 5) result += "/" + digits.slice(4, 8);
+
+        return result;
+    }
+
+    function formatCurrentValue() {
+        if (isFormatting) return;
+
+        isFormatting = true;
+
+        const start = input.selectionStart ?? input.value.length;
+        const before = input.value;
+        const digitsBeforeCursor = before.slice(0, start).replace(/\D/g, "").length;
+
+        const masked = buildMaskedValue(before);
+        input.value = masked;
+
+        let nextCursor = digitsBeforeCursor;
+        if (digitsBeforeCursor >= 3) nextCursor += 1;
+        if (digitsBeforeCursor >= 5) nextCursor += 1;
+
+        const safeCursor = Math.min(nextCursor, input.value.length);
+        requestAnimationFrame(() => {
+            try {
+                input.setSelectionRange(safeCursor, safeCursor);
+            } catch (_) {}
+        });
+
+        input.classList.remove("field-error");
+        isFormatting = false;
+    }
+
+    input.addEventListener("input", () => {
+        formatCurrentValue();
+        const parsed = parseSlashDate(input.value);
+        if (parsed && typeof onValidChange === "function") {
+            onValidChange(parsed);
+        }
+    });
+
+    input.addEventListener("keydown", (e) => {
+        if (e.key === " " || e.key === "." || e.key === "-") {
+            e.preventDefault();
+            formatCurrentValue();
+        }
+    });
+
+    input.addEventListener("paste", () => {
+        requestAnimationFrame(() => {
+            formatCurrentValue();
+            const parsed = parseSlashDate(input.value);
+            if (parsed && typeof onValidChange === "function") {
+                onValidChange(parsed);
+            }
+        });
+    });
+
+    input.addEventListener("blur", () => {
+        const text = String(input.value || "").trim();
+
+        if (!text) {
+            input.classList.remove("field-error");
+            if (typeof onValidChange === "function") onValidChange(null);
+            return;
+        }
+
+        const parsed = parseSlashDate(text);
+        if (!parsed) {
+            input.classList.add("field-error");
+            return;
+        }
+
+        input.value = formatDateToSlash(parsed);
+        input.classList.remove("field-error");
+
+        if (typeof onValidChange === "function") {
+            onValidChange(parsed);
+        }
+    });
+}
+
 function formatMonthValue(year, monthIndex) {
     return `${MONTH_NAMES_SHORT[monthIndex]} ${year}`;
 }
@@ -442,8 +406,10 @@ function parseMonthDisplay(value) {
     if (!value) return null;
     const match = String(value).trim().match(/^([A-Za-z]{3})\s+(\d{4})$/);
     if (!match) return null;
+
     const monthIndex = MONTH_NAMES_SHORT.findIndex(m => m.toLowerCase() === match[1].toLowerCase());
     if (monthIndex < 0) return null;
+
     return {
         year: Number(match[2]),
         monthIndex
@@ -539,6 +505,56 @@ function formatDateTime(value) {
     });
 }
 
+function setTimeInputValue(inputId, hhmmValue) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    const normalized = normalizeTimeInputValue(hhmmValue);
+    input.value = normalized ? formatTimeForDisplay(normalized) : "";
+    input.dataset.timeValue = normalized || "";
+    input.classList.remove("field-error");
+}
+
+function getTimeInputValue(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return "";
+
+    const normalizedTyped = normalizeTimeInputValue(input.value);
+    if (normalizedTyped) {
+        input.dataset.timeValue = normalizedTyped;
+        return normalizedTyped;
+    }
+
+    return input.dataset.timeValue || "";
+}
+
+function refreshTimeDisplaysForFormatChange() {
+    ["pickup_time", "delivery_time"].forEach(id => {
+        const value = getTimeInputValue(id);
+        if (value) {
+            setTimeInputValue(id, value);
+        }
+    });
+}
+
+function handleManualTimeInput(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return false;
+
+    const normalized = normalizeTimeInputValue(input.value);
+
+    if (normalized) {
+        input.dataset.timeValue = normalized;
+        input.value = formatTimeForDisplay(normalized);
+        input.classList.remove("field-error");
+        return true;
+    }
+
+    input.dataset.timeValue = "";
+    input.classList.add("field-error");
+    return false;
+}
+
 function getInputValue(id) {
     const el = document.getElementById(id);
     if (!el) return null;
@@ -560,10 +576,9 @@ function buildDateTime(dateId, timeId) {
     const dateValue = getInputValue(dateId);
     const rawTime = getInputValue(timeId);
     const time = normalizeTimeInputValue(rawTime);
-
     const isoDate = slashDateToIso(dateValue);
-    if (!isoDate || !time) return null;
 
+    if (!isoDate || !time) return null;
     return `${isoDate}T${time}`;
 }
 
@@ -600,6 +615,117 @@ function populateStateSelect(selectId) {
         option.textContent = state;
         select.appendChild(option);
     });
+}
+
+function openDeleteShipmentModal(id) {
+    pendingDeleteShipmentId = id;
+    if (confirmDeleteShipmentModal) {
+        confirmDeleteShipmentModal.style.display = "flex";
+    }
+}
+
+function closeDeleteShipmentModal() {
+    pendingDeleteShipmentId = null;
+    if (confirmDeleteShipmentModal) {
+        confirmDeleteShipmentModal.style.display = "none";
+    }
+}
+
+async function executeDeleteShipment() {
+    if (!pendingDeleteShipmentId) return;
+
+    try {
+        let response = await fetchWithAuth(`${API_BASE_URL}/shipments/delete/${pendingDeleteShipmentId}`, {
+            method: "DELETE"
+        });
+
+        if (!response || response.status === 404 || response.status === 405) {
+            response = await fetchWithAuth(`${API_BASE_URL}/shipments/delete`, {
+                method: "DELETE",
+                body: JSON.stringify({ shipment_id: pendingDeleteShipmentId })
+            });
+        }
+
+        closeDeleteShipmentModal();
+        await loadShipments();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function deleteShipment(shipmentId) {
+    openDeleteShipmentModal(shipmentId);
+}
+
+function openCreateModal() {
+    resetShipmentForm();
+    document.getElementById("edit_shipment_id").value = "";
+    shipmentModalTitle.textContent = "Create Shipment";
+    shipmentSubmitBtn.textContent = "Save";
+    shipmentSubmitBtn.disabled = false;
+    editOnlyShipmentStatus.style.display = "none";
+    editOnlyPaymentStatus.style.display = "none";
+    openModal();
+}
+
+function openModal() {
+    if (shipmentModal) shipmentModal.style.display = "flex";
+}
+
+function closeModal() {
+    if (shipmentModal) shipmentModal.style.display = "none";
+}
+
+function openLogsModal() {
+    if (shipmentLogsModal) shipmentLogsModal.style.display = "flex";
+}
+
+function closeLogsModal() {
+    if (shipmentLogsModal) shipmentLogsModal.style.display = "none";
+}
+
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.openCreateModal = openCreateModal;
+window.closeLogsModal = closeLogsModal;
+
+function calculateProfit() {
+    if (!brokerPriceInput || !driverPayInput || !calculatedProfitBox) return;
+
+    const broker = Number(brokerPriceInput.value) || 0;
+    const driver = Number(driverPayInput.value) || 0;
+    const profit = broker - driver;
+
+    calculatedProfitBox.textContent = `Profit: $${profit.toLocaleString()}`;
+}
+
+function getStatusClass(status) {
+    const key = (status || "").toLowerCase();
+    const modifier = STATUS_CLASS_MAP[key] || "status-created";
+    return `shipment-status ${modifier}`;
+}
+
+function createTextCell(text, extraClass = "") {
+    const td = document.createElement("td");
+    if (extraClass) td.className = extraClass;
+    td.textContent = text ?? "—";
+    td.title = text ?? "—";
+    return td;
+}
+
+function createHtmlCell(node, extraClass = "") {
+    const td = document.createElement("td");
+    if (extraClass) td.className = extraClass;
+    td.appendChild(node);
+    return td;
+}
+
+function createMaskedFinanceCell() {
+    const td = document.createElement("td");
+    td.className = "masked-finance";
+    td.textContent = "Hidden";
+    td.title = "Visible only to owner or privileged roles";
+    return td;
 }
 
 function getDefaultColumns() {
@@ -758,9 +884,7 @@ function createColumnChip(col, index, zoneType) {
         draggedColumnKey = null;
     });
 
-    chip.addEventListener("dragover", (e) => {
-        e.preventDefault();
-    });
+    chip.addEventListener("dragover", (e) => e.preventDefault());
 
     chip.addEventListener("drop", (e) => {
         e.preventDefault();
@@ -796,6 +920,8 @@ function createColumnChip(col, index, zoneType) {
 }
 
 function setupZoneDrop(zoneEl, zoneType) {
+    if (!zoneEl) return;
+
     zoneEl.addEventListener("dragover", (e) => {
         e.preventDefault();
         zoneEl.classList.add("zone-drop-hover");
@@ -815,13 +941,9 @@ function setupZoneDrop(zoneEl, zoneType) {
         if (!draggedCol) return;
 
         if (zoneType === "visible") {
-            if (!draggedCol.visible) {
-                moveColumnToVisible(draggedColumnKey);
-            }
+            if (!draggedCol.visible) moveColumnToVisible(draggedColumnKey);
         } else {
-            if (draggedCol.visible) {
-                moveColumnToHidden(draggedColumnKey);
-            }
+            if (draggedCol.visible) moveColumnToHidden(draggedColumnKey);
         }
 
         saveColumnsToStorage();
@@ -893,17 +1015,11 @@ function getLocationClass(type, shipmentStatus) {
     const status = (shipmentStatus || "").toLowerCase();
 
     if (type === "pickup") {
-        if (["picked_up", "in_transit", "delivered"].includes(status)) {
-            return "loc-done";
-        }
-        return "loc-pending";
+        return ["picked_up", "in_transit", "delivered"].includes(status) ? "loc-done" : "loc-pending";
     }
 
     if (type === "delivery") {
-        if (status === "delivered") {
-            return "loc-done";
-        }
-        return "loc-pending";
+        return status === "delivered" ? "loc-done" : "loc-pending";
     }
 
     return "loc-pending";
@@ -1000,6 +1116,7 @@ function closeFloatingActionMenu() {
     floatingActionMenu.classList.remove("open");
     floatingActionMenu.innerHTML = "";
     floatingActionMenuOpen = false;
+    delete floatingActionMenu.dataset.shipmentId;
 }
 
 function escapeHtml(value) {
@@ -1016,11 +1133,13 @@ function appendFloatingMenuButton(text, onClick, danger = false) {
     btn.type = "button";
     btn.textContent = text;
     if (danger) btn.style.color = "#fca5a5";
+
     btn.addEventListener("click", async (e) => {
         e.stopPropagation();
         closeFloatingActionMenu();
         await onClick();
     });
+
     floatingActionMenu.appendChild(btn);
 }
 
@@ -1071,45 +1190,9 @@ async function updateShipmentStatus(shipmentId, newStatus) {
         }
 
         await loadShipments();
-
     } catch (err) {
         console.error("Status update error:", err);
         alert("Server error while updating shipment status.");
-    }
-}
-
-async function deleteShipment(shipmentId) {
-    const confirmed = window.confirm("Are you sure you want to delete this shipment?");
-    if (!confirmed) return;
-
-    try {
-        let response = await fetchWithAuth(`${API_BASE_URL}/shipments/delete/${shipmentId}`, {
-            method: "DELETE"
-        });
-
-        if (!response || response.status === 404 || response.status === 405) {
-            response = await fetchWithAuth(`${API_BASE_URL}/shipments/delete`, {
-                method: "DELETE",
-                body: JSON.stringify({ shipment_id: shipmentId })
-            });
-        }
-
-        if (!response) return;
-
-        let result = {};
-        try {
-            result = await response.json();
-        } catch {}
-
-        if (!response.ok) {
-            alert(result.detail || "Failed to delete shipment.");
-            return;
-        }
-
-        await loadShipments();
-    } catch (err) {
-        console.error("Delete shipment error:", err);
-        alert("Server error while deleting shipment.");
     }
 }
 
@@ -1188,10 +1271,10 @@ function renderLogs(logs, shipmentId) {
 
         card.innerHTML = `
             <div class="log-card-top">
-                <div class="log-user">${userName}</div>
-                <div class="log-date">${changedAt}</div>
+                <div class="log-user">${escapeHtml(userName)}</div>
+                <div class="log-date">${escapeHtml(changedAt)}</div>
             </div>
-            <div class="log-field">${fieldName}</div>
+            <div class="log-field">${escapeHtml(fieldName)}</div>
             <div class="log-values">
                 <div class="log-value-box"><strong>Old:</strong> ${escapeHtml(oldValue)}</div>
                 <div class="log-value-box"><strong>New:</strong> ${escapeHtml(newValue)}</div>
@@ -1228,7 +1311,6 @@ function saveBrokerNameToHistory(name) {
         const raw = localStorage.getItem(BROKER_NAMES_KEY);
         const list = raw ? JSON.parse(raw) : [];
         const normalized = String(name).trim();
-
         if (!normalized) return;
 
         const filtered = list.filter(item => item.toLowerCase() !== normalized.toLowerCase());
@@ -1256,54 +1338,6 @@ function renderBrokerNameSuggestions() {
     } catch {}
 }
 
-function setTimeInputValue(inputId, hhmmValue) {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-
-    const normalized = normalizeTimeInputValue(hhmmValue);
-    input.value = normalized ? formatTimeForDisplay(normalized) : "";
-    input.dataset.timeValue = normalized || "";
-}
-
-function getTimeInputValue(inputId) {
-    const input = document.getElementById(inputId);
-    if (!input) return "";
-
-    const normalizedTyped = normalizeTimeInputValue(input.value);
-    if (normalizedTyped) {
-        input.dataset.timeValue = normalizedTyped;
-        return normalizedTyped;
-    }
-
-    return input.dataset.timeValue || "";
-}
-
-function refreshTimeDisplaysForFormatChange() {
-    ["pickup_time", "delivery_time"].forEach(id => {
-        const value = getTimeInputValue(id);
-        if (value) {
-            setTimeInputValue(id, value);
-        }
-    });
-}
-
-function handleManualTimeInput(inputId) {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-
-    const normalized = normalizeTimeInputValue(input.value);
-
-    if (normalized) {
-        input.dataset.timeValue = normalized;
-        input.value = formatTimeForDisplay(normalized);
-        input.classList.remove("field-error");
-        return true;
-    }
-
-    input.dataset.timeValue = "";
-    return false;
-}
-
 function fillShipmentForm(item) {
     document.getElementById("edit_shipment_id").value = item.shipment_id || "";
     document.getElementById("external_reference").value = item.external_reference ?? "";
@@ -1326,11 +1360,15 @@ function fillShipmentForm(item) {
     document.getElementById("edit_payment_status").value = item.payment_status ?? "unpaid";
 
     const pickup = splitDateTime(item.pickup_datetime);
-    document.getElementById("pickup_date").value = pickup.date;
+    const pickupDateEl = document.getElementById("pickup_date");
+    pickupDateEl.value = pickup.date;
+    pickupDateEl.classList.remove("field-error");
     setTimeInputValue("pickup_time", pickup.time);
 
     const delivery = splitDateTime(item.delivery_datetime);
-    document.getElementById("delivery_date").value = delivery.date;
+    const deliveryDateEl = document.getElementById("delivery_date");
+    deliveryDateEl.value = delivery.date;
+    deliveryDateEl.classList.remove("field-error");
     setTimeInputValue("delivery_time", delivery.time);
 
     clearFormErrors();
@@ -1365,6 +1403,7 @@ function positionFloatingMenu(anchorBtn) {
     const rect = anchorBtn.getBoundingClientRect();
     const menuWidth = 190;
     const menuHeightEstimate = 220;
+
     let left = rect.left - menuWidth - 8;
     let top = rect.top;
 
@@ -1612,7 +1651,6 @@ async function loadShipments() {
 
         renderBrokerNameSuggestions();
         refreshFilteredView();
-
     } catch (err) {
         console.error("Shipments load error:", err);
         showTableError("Failed to load shipments.");
@@ -1684,13 +1722,8 @@ async function handleCreateOrUpdateShipment(event) {
 
     if (isCreating) return;
 
-    if (pickupTimeInput?.value.trim()) {
-        handleManualTimeInput("pickup_time");
-    }
-
-    if (deliveryTimeInput?.value.trim()) {
-        handleManualTimeInput("delivery_time");
-    }
+    if (pickupTimeInput?.value.trim()) handleManualTimeInput("pickup_time");
+    if (deliveryTimeInput?.value.trim()) handleManualTimeInput("delivery_time");
 
     if (!validateRequiredFields()) return;
 
@@ -1777,7 +1810,6 @@ async function handleCreateOrUpdateShipment(event) {
         closeModal();
         resetShipmentForm();
         await loadShipments();
-
     } catch (err) {
         console.error("Save shipment error:", err);
         alert("Server error while saving shipment.");
@@ -1795,25 +1827,37 @@ function setDefaultMonthFilter() {
 }
 
 function bindFilterEvents() {
-    [filterCompanyReference, filterBrokerReference, filterCreatedDate, filterGlobalSearch]
-        .forEach(el => {
-            if (el) {
-                el.addEventListener("input", refreshFilteredView);
-                el.addEventListener("change", refreshFilteredView);
+    [filterCompanyReference, filterBrokerReference, filterGlobalSearch].forEach(el => {
+        if (!el) return;
+        el.addEventListener("input", refreshFilteredView);
+        el.addEventListener("change", refreshFilteredView);
+    });
+
+    if (filterCreatedDate) {
+        normalizeDateTyping(filterCreatedDate, () => {
+            refreshFilteredView();
+        });
+
+        filterCreatedDate.addEventListener("change", refreshFilteredView);
+        filterCreatedDate.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                refreshFilteredView();
             }
         });
+    }
 }
 
 function openDatePickerFor(inputId, titleText) {
     datePickerTargetInputId = inputId;
-    dateModalTitle.textContent = titleText || "Select Date";
+    if (dateModalTitle) dateModalTitle.textContent = titleText || "Select Date";
 
     const input = document.getElementById(inputId);
     const parsed = parseSlashDate(input?.value);
     datePickerViewDate = parsed || new Date();
 
     renderDatePickerGrid();
-    datePickerModal.style.display = "flex";
+    if (datePickerModal) datePickerModal.style.display = "flex";
 }
 
 function closeDatePickerModal() {
@@ -1905,7 +1949,7 @@ function openMonthPicker() {
     const parsed = parseMonthDisplay(filterMonth?.value || "");
     monthPickerViewYear = parsed?.year || new Date().getFullYear();
     renderMonthPickerGrid();
-    monthPickerModal.style.display = "flex";
+    if (monthPickerModal) monthPickerModal.style.display = "flex";
 }
 
 function closeMonthPicker() {
@@ -1920,90 +1964,47 @@ function renderMonthPickerGrid() {
 
     const selected = parseMonthDisplay(filterMonth?.value || "");
 
-    MONTH_NAMES_SHORT.forEach((monthName, monthIndex) => {
+    MONTH_NAMES_SHORT.forEach((name, index) => {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "month-btn";
-        btn.textContent = monthName;
+        btn.textContent = name;
 
-        if (selected && selected.year === monthPickerViewYear && selected.monthIndex === monthIndex) {
+        if (selected && selected.year === monthPickerViewYear && selected.monthIndex === index) {
             btn.classList.add("active");
         }
 
         btn.addEventListener("click", () => {
-            filterMonth.value = formatMonthValue(monthPickerViewYear, monthIndex);
-            refreshFilteredView();
+            filterMonth.value = formatMonthValue(monthPickerViewYear, index);
             closeMonthPicker();
+            refreshFilteredView();
         });
 
         monthGrid.appendChild(btn);
     });
 }
 
-function parseTimeState(value) {
-    const normalized = normalizeTimeInputValue(value);
-
-    if (!normalized) {
-        return { hour: 12, minute: 0, ampm: "AM" };
-    }
-
-    const [hh, mm] = normalized.split(":").map(Number);
-    const ampm = hh >= 12 ? "PM" : "AM";
-    let hour12 = hh % 12;
-    if (hour12 === 0) hour12 = 12;
-
-    return {
-        hour: hour12,
-        minute: mm,
-        ampm
-    };
-}
-
-function timeStateTo24HourValue() {
-    let hour = timePickerState.hour;
-
-    if (timePickerState.ampm === "AM") {
-        if (hour === 12) hour = 0;
-    } else {
-        if (hour !== 12) hour += 12;
-    }
-
-    return `${String(hour).padStart(2, "0")}:${String(timePickerState.minute).padStart(2, "0")}`;
-}
-
-function renderTimePicker() {
-    if (!timeHourDisplay || !timeMinuteDisplay || !timePreviewBox) return;
-
-    const format = getTimeFormat();
-    const value24 = timeStateTo24HourValue();
-    const [hour24Str, minuteStr] = value24.split(":");
-    const hour24 = Number(hour24Str);
-
-    if (format === "24") {
-        timeHourDisplay.textContent = String(hour24).padStart(2, "0");
-    } else {
-        timeHourDisplay.textContent = String(timePickerState.hour).padStart(2, "0");
-    }
-
-    timeMinuteDisplay.textContent = minuteStr;
-    timePreviewBox.textContent = formatTimeForDisplay(value24);
-
-    if (timeAmBtn) timeAmBtn.classList.toggle("active", timePickerState.ampm === "AM");
-    if (timePmBtn) timePmBtn.classList.toggle("active", timePickerState.ampm === "PM");
-
-    const toggle = document.getElementById("timeAmPmToggle");
-    if (toggle) {
-        toggle.style.display = format === "24" ? "none" : "grid";
-    }
-}
-
 function openTimePickerFor(inputId, titleText) {
     timePickerTargetInputId = inputId;
-    if (timeModalTitle) {
-        timeModalTitle.textContent = titleText || "Select Time";
+    if (timeModalTitle) timeModalTitle.textContent = titleText || "Select Time";
+
+    const current = getTimeInputValue(inputId);
+
+    if (current) {
+        const [hh, mm] = current.split(":").map(Number);
+        const ampm = hh >= 12 ? "PM" : "AM";
+        let hour12 = hh % 12;
+        if (hour12 === 0) hour12 = 12;
+
+        timePickerState = {
+            hour: hour12,
+            minute: mm,
+            ampm
+        };
+    } else {
+        timePickerState = { hour: 12, minute: 0, ampm: "AM" };
     }
 
-    timePickerState = parseTimeState(getTimeInputValue(inputId) || document.getElementById(inputId)?.value || "");
     renderTimePicker();
 
     if (timePickerModal) {
@@ -2012,85 +2013,71 @@ function openTimePickerFor(inputId, titleText) {
 }
 
 function closeTimePicker() {
-    if (timePickerModal) {
-        timePickerModal.style.display = "none";
-    }
+    if (timePickerModal) timePickerModal.style.display = "none";
     timePickerTargetInputId = null;
 }
 
-function adjustTimeHour(delta) {
-    const format = getTimeFormat();
+function renderTimePicker() {
+    if (!timeHourDisplay || !timeMinuteDisplay || !timePreviewBox) return;
 
-    if (format === "24") {
-        const current24 = Number(timeStateTo24HourValue().split(":")[0]);
-        let next24 = (current24 + delta + 24) % 24;
+    timeHourDisplay.textContent = String(timePickerState.hour).padStart(2, "0");
+    timeMinuteDisplay.textContent = String(timePickerState.minute).padStart(2, "0");
 
-        timePickerState.ampm = next24 >= 12 ? "PM" : "AM";
-        let hour12 = next24 % 12;
-        if (hour12 === 0) hour12 = 12;
-        timePickerState.hour = hour12;
-    } else {
-        let nextHour = timePickerState.hour + delta;
-        if (nextHour > 12) nextHour = 1;
-        if (nextHour < 1) nextHour = 12;
-        timePickerState.hour = nextHour;
-    }
+    if (timeAmBtn) timeAmBtn.classList.toggle("active", timePickerState.ampm === "AM");
+    if (timePmBtn) timePmBtn.classList.toggle("active", timePickerState.ampm === "PM");
 
+    let hour24 = timePickerState.hour % 12;
+    if (timePickerState.ampm === "PM") hour24 += 12;
+
+    const hhmm = `${String(hour24).padStart(2, "0")}:${String(timePickerState.minute).padStart(2, "0")}`;
+    timePreviewBox.textContent = formatTimeForDisplay(hhmm);
+}
+
+function adjustTimeHour(step) {
+    let next = timePickerState.hour + step;
+    if (next > 12) next = 1;
+    if (next < 1) next = 12;
+    timePickerState.hour = next;
     renderTimePicker();
 }
 
-function adjustTimeMinute(delta) {
-    let next = timePickerState.minute + delta;
-    if (next > 59) next = 0;
-    if (next < 0) next = 55;
+function adjustTimeMinute(step) {
+    let next = timePickerState.minute + step;
+
+    while (next >= 60) next -= 60;
+    while (next < 0) next += 60;
+
     timePickerState.minute = next;
     renderTimePicker();
 }
 
 function applyTimePickerValue() {
     if (!timePickerTargetInputId) return;
-    const value = timeStateTo24HourValue();
-    setTimeInputValue(timePickerTargetInputId, value);
+
+    let hour24 = timePickerState.hour % 12;
+    if (timePickerState.ampm === "PM") hour24 += 12;
+
+    const hhmm = `${String(hour24).padStart(2, "0")}:${String(timePickerState.minute).padStart(2, "0")}`;
+    setTimeInputValue(timePickerTargetInputId, hhmm);
 
     const input = document.getElementById(timePickerTargetInputId);
-    if (input) {
-        input.classList.remove("field-error");
-    }
+    input?.classList.remove("field-error");
 
     closeTimePicker();
 }
 
 function openTimeFormatModal() {
-    syncTimeFormatUI();
     if (timeFormatModal) {
+        syncTimeFormatUI();
         timeFormatModal.style.display = "flex";
     }
 }
 
 function closeTimeFormatModal() {
-    if (timeFormatModal) {
-        timeFormatModal.style.display = "none";
-    }
+    if (timeFormatModal) timeFormatModal.style.display = "none";
 }
 
-document.addEventListener("click", () => {
-    closeFloatingActionMenu();
-});
-
-window.addEventListener("resize", () => {
-    closeFloatingActionMenu();
-});
-
-window.addEventListener("scroll", () => {
-    closeFloatingActionMenu();
-}, true);
-
 document.addEventListener("DOMContentLoaded", () => {
-    if (!getToken()) {
-        clearAuthAndRedirect();
-        return;
-    }
-
     shipmentsTable = document.getElementById("shipmentsTable");
     shipmentsHeaderRow = document.getElementById("shipmentsHeaderRow");
     logoutBtn = document.getElementById("logoutBtn");
@@ -2130,6 +2117,10 @@ document.addEventListener("DOMContentLoaded", () => {
     floatingActionMenu = document.getElementById("floatingActionMenu");
     pickupTimeInput = document.getElementById("pickup_time");
     deliveryTimeInput = document.getElementById("delivery_time");
+
+    confirmDeleteShipmentModal = document.getElementById("confirmDeleteShipmentModal");
+    cancelDeleteShipmentBtn = document.getElementById("cancelDeleteShipmentBtn");
+    confirmDeleteShipmentBtn = document.getElementById("confirmDeleteShipmentBtn");
 
     datePickerModal = document.getElementById("datePickerModal");
     datePrevMonthBtn = document.getElementById("datePrevMonthBtn");
@@ -2175,6 +2166,11 @@ document.addEventListener("DOMContentLoaded", () => {
     setDefaultMonthFilter();
     bindFilterEvents();
     syncTimeFormatUI();
+
+    normalizeDateTyping(document.getElementById("pickup_date"));
+    normalizeDateTyping(document.getElementById("delivery_date"));
+
+    calculateProfit();
     setTimeInputValue("pickup_time", "");
     setTimeInputValue("delivery_time", "");
 
@@ -2330,9 +2326,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    if (dateCloseBtn) {
-        dateCloseBtn.addEventListener("click", closeDatePickerModal);
-    }
+    if (dateCloseBtn) dateCloseBtn.addEventListener("click", closeDatePickerModal);
 
     if (dateClearBtn) {
         dateClearBtn.addEventListener("click", () => {
@@ -2364,82 +2358,73 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    if (monthCloseBtn) {
-        monthCloseBtn.addEventListener("click", closeMonthPicker);
-    }
+    if (monthCloseBtn) monthCloseBtn.addEventListener("click", closeMonthPicker);
 
     if (monthClearBtn) {
         monthClearBtn.addEventListener("click", () => {
-            filterMonth.value = "";
-            refreshFilteredView();
+            if (filterMonth) filterMonth.value = "";
             closeMonthPicker();
+            refreshFilteredView();
         });
     }
 
-    if (filterMonth) {
-        filterMonth.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openMonthPicker();
-        });
+    if (formatCloseBtn) formatCloseBtn.addEventListener("click", closeTimeFormatModal);
+
+    if (cancelDeleteShipmentBtn) {
+        cancelDeleteShipmentBtn.addEventListener("click", closeDeleteShipmentModal);
     }
 
-    if (formatCloseBtn) {
-        formatCloseBtn.addEventListener("click", closeTimeFormatModal);
+    if (confirmDeleteShipmentBtn) {
+        confirmDeleteShipmentBtn.addEventListener("click", executeDeleteShipment);
+    }
+
+    if (confirmDeleteShipmentModal) {
+        confirmDeleteShipmentModal.addEventListener("click", (e) => {
+            if (e.target === confirmDeleteShipmentModal) {
+                closeDeleteShipmentModal();
+            }
+        });
     }
 
     if (shipmentModal) {
         shipmentModal.addEventListener("click", (e) => {
-            if (e.target === shipmentModal) {
-                closeModal();
-            }
+            if (e.target === shipmentModal) closeModal();
         });
     }
 
     if (shipmentLogsModal) {
         shipmentLogsModal.addEventListener("click", (e) => {
-            if (e.target === shipmentLogsModal) {
-                closeLogsModal();
-            }
+            if (e.target === shipmentLogsModal) closeLogsModal();
         });
     }
 
     if (datePickerModal) {
         datePickerModal.addEventListener("click", (e) => {
-            if (e.target === datePickerModal) {
-                closeDatePickerModal();
-            }
+            if (e.target === datePickerModal) closeDatePickerModal();
         });
     }
 
     if (monthPickerModal) {
         monthPickerModal.addEventListener("click", (e) => {
-            if (e.target === monthPickerModal) {
-                closeMonthPicker();
-            }
+            if (e.target === monthPickerModal) closeMonthPicker();
         });
     }
 
     if (timePickerModal) {
         timePickerModal.addEventListener("click", (e) => {
-            if (e.target === timePickerModal) {
-                closeTimePicker();
-            }
+            if (e.target === timePickerModal) closeTimePicker();
         });
     }
 
     if (timeFormatModal) {
         timeFormatModal.addEventListener("click", (e) => {
-            if (e.target === timeFormatModal) {
-                closeTimeFormatModal();
-            }
+            if (e.target === timeFormatModal) closeTimeFormatModal();
         });
     }
 
-    if (floatingActionMenu) {
-        floatingActionMenu.addEventListener("click", (e) => {
-            e.stopPropagation();
-        });
-    }
-
-    calculateProfit();
+    document.addEventListener("click", (e) => {
+        if (floatingActionMenuOpen && floatingActionMenu && !floatingActionMenu.contains(e.target)) {
+            closeFloatingActionMenu();
+        }
+    });
 });
