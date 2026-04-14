@@ -22,7 +22,7 @@ let shipmentModalTitle, shipmentSubmitBtn, shipmentLogsTitle, shipmentLogsContai
 let visibleColumnList, hiddenColumnList;
 let visibleColumnsZone, hiddenColumnsZone;
 let filterCompanyReference, filterBrokerReference, filterCreatedDate, filterGlobalSearch, filterMonth;
-let filterCreatedDatePickerBtn, filterMonthPickerBtn, pickupDatePickerBtn, deliveryDatePickerBtn;
+let filterCreatedDatePickerBtn, filterMonthPickerBtn, pickupDatePickerBtn, deliveryDatePickerBtn, shipmentCreatedDatePickerBtn;
 let editOnlyShipmentStatus, editOnlyPaymentStatus;
 let pickupTimeInput, deliveryTimeInput;
 
@@ -101,6 +101,7 @@ const ALL_COLUMNS = [
 ];
 
 const REQUIRED_FIELD_IDS = [
+    "shipment_created_date",
     "external_reference",
     "unit_number",
     "driver_name",
@@ -253,9 +254,9 @@ function formatDateOnly(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
 
-    return date.toLocaleDateString("en-GB", {
-        day: "2-digit",
+    return date.toLocaleDateString("en-US", {
         month: "2-digit",
+        day: "2-digit",
         year: "numeric"
     });
 }
@@ -265,11 +266,11 @@ function formatDateToSlash(value) {
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return "";
 
-    const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     const year = date.getFullYear();
 
-    return `${day}/${month}/${year}`;
+    return `${month}/${day}/${year}`;
 }
 
 function parseSlashDate(value) {
@@ -279,8 +280,8 @@ function parseSlashDate(value) {
     const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (!match) return null;
 
-    const day = Number(match[1]);
-    const month = Number(match[2]);
+    const month = Number(match[1]);
+    const day = Number(match[2]);
     const year = Number(match[3]);
 
     const date = new Date(year, month - 1, day);
@@ -485,9 +486,9 @@ function formatDateTime(value) {
     const format = getTimeFormat();
 
     if (format === "24") {
-        return date.toLocaleString("en-GB", {
-            day: "2-digit",
+        return date.toLocaleString("en-US", {
             month: "2-digit",
+            day: "2-digit",
             year: "numeric",
             hour: "2-digit",
             minute: "2-digit",
@@ -496,8 +497,8 @@ function formatDateTime(value) {
     }
 
     return date.toLocaleString("en-US", {
-        day: "2-digit",
         month: "2-digit",
+        day: "2-digit",
         year: "numeric",
         hour: "numeric",
         minute: "2-digit",
@@ -580,6 +581,14 @@ function buildDateTime(dateId, timeId) {
 
     if (!isoDate || !time) return null;
     return `${isoDate}T${time}`;
+}
+
+function buildCreatedDateTime(dateId) {
+    const dateValue = getInputValue(dateId);
+    const isoDate = slashDateToIso(dateValue);
+
+    if (!isoDate) return null;
+    return `${isoDate}T00:00`;
 }
 
 function splitDateTime(value) {
@@ -1340,6 +1349,13 @@ function renderBrokerNameSuggestions() {
 
 function fillShipmentForm(item) {
     document.getElementById("edit_shipment_id").value = item.shipment_id || "";
+
+    const createdDateEl = document.getElementById("shipment_created_date");
+    if (createdDateEl) {
+        createdDateEl.value = formatDateToSlash(item.shipment_created_date);
+        createdDateEl.classList.remove("field-error");
+    }
+
     document.getElementById("external_reference").value = item.external_reference ?? "";
     document.getElementById("unit_number").value = item.unit_number ?? "";
     document.getElementById("driver_name").value = item.driver_name ?? "";
@@ -1382,6 +1398,13 @@ function resetShipmentForm() {
     document.getElementById("edit_payment_status").value = "unpaid";
     setTimeInputValue("pickup_time", "");
     setTimeInputValue("delivery_time", "");
+
+    const createdDateEl = document.getElementById("shipment_created_date");
+    if (createdDateEl) {
+        createdDateEl.value = "";
+        createdDateEl.classList.remove("field-error");
+    }
+
     clearFormErrors();
     calculateProfit();
 }
@@ -1680,8 +1703,14 @@ function validateRequiredFields() {
         }
     });
 
+    const shipmentCreatedDate = parseSlashDate(getInputValue("shipment_created_date"));
     const pickupDate = parseSlashDate(getInputValue("pickup_date"));
     const deliveryDate = parseSlashDate(getInputValue("delivery_date"));
+
+    if (getInputValue("shipment_created_date") && !shipmentCreatedDate) {
+        document.getElementById("shipment_created_date")?.classList.add("field-error");
+        missing.push("shipment_created_date_format");
+    }
 
     if (getInputValue("pickup_date") && !pickupDate) {
         document.getElementById("pickup_date")?.classList.add("field-error");
@@ -1731,6 +1760,7 @@ async function handleCreateOrUpdateShipment(event) {
 
     const payload = {
         company_id: 1,
+        shipment_created_date: buildCreatedDateTime("shipment_created_date"),
         unit_number: getInputValue("unit_number"),
         external_reference: getInputValue("external_reference"),
         driver_name: getInputValue("driver_name"),
@@ -1751,8 +1781,8 @@ async function handleCreateOrUpdateShipment(event) {
         comments: getInputValue("comments")
     };
 
-    if (!payload.pickup_datetime || !payload.delivery_datetime) {
-        alert("Pickup and delivery date/time are required.");
+    if (!payload.shipment_created_date || !payload.pickup_datetime || !payload.delivery_datetime) {
+        alert("Created, pickup, and delivery date/time are required.");
         return;
     }
 
@@ -2112,6 +2142,7 @@ document.addEventListener("DOMContentLoaded", () => {
     filterMonthPickerBtn = document.getElementById("filterMonthPickerBtn");
     pickupDatePickerBtn = document.getElementById("pickupDatePickerBtn");
     deliveryDatePickerBtn = document.getElementById("deliveryDatePickerBtn");
+    shipmentCreatedDatePickerBtn = document.getElementById("shipmentCreatedDatePickerBtn");
     editOnlyShipmentStatus = document.getElementById("editOnlyShipmentStatus");
     editOnlyPaymentStatus = document.getElementById("editOnlyPaymentStatus");
     floatingActionMenu = document.getElementById("floatingActionMenu");
@@ -2167,6 +2198,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bindFilterEvents();
     syncTimeFormatUI();
 
+    normalizeDateTyping(document.getElementById("shipment_created_date"));
     normalizeDateTyping(document.getElementById("pickup_date"));
     normalizeDateTyping(document.getElementById("delivery_date"));
 
@@ -2222,6 +2254,13 @@ document.addEventListener("DOMContentLoaded", () => {
         filterMonthPickerBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             openMonthPicker();
+        });
+    }
+
+    if (shipmentCreatedDatePickerBtn) {
+        shipmentCreatedDatePickerBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openDatePickerFor("shipment_created_date", "Select Created Date");
         });
     }
 

@@ -144,7 +144,7 @@ def get_period_totals(cursor, period: str, base_date: str, staff_id=None):
 
 
 # =============================
-# DISPATCHER / PERSONAL BREAKDOWN
+# PERSONAL / DISPATCHER BREAKDOWN
 # =============================
 def get_personal_breakdown_query(period: str):
     period = (period or "month").lower()
@@ -162,13 +162,13 @@ def get_personal_breakdown_query(period: str):
               AND DATE(shipment_created_date) = %s
               AND assigned_staff_id = %s
             GROUP BY DATE_FORMAT(shipment_created_date, '%H:00')
-            ORDER BY label
+            ORDER BY DATE_FORMAT(shipment_created_date, '%H:00')
         """
 
     if period == "week":
         return """
             SELECT
-                DATE_FORMAT(DATE(shipment_created_date), '%Y-%m-%d') AS label,
+                DATE_FORMAT(shipment_created_date, '%Y-%m-%d') AS label,
                 COUNT(*) AS shipments,
                 COALESCE(SUM(profit), 0) AS profit,
                 COALESCE(SUM(broker_price), 0) AS gross
@@ -177,13 +177,13 @@ def get_personal_breakdown_query(period: str):
               AND shipment_created_date IS NOT NULL
               AND YEARWEEK(shipment_created_date, 1) = YEARWEEK(%s, 1)
               AND assigned_staff_id = %s
-            GROUP BY DATE(shipment_created_date)
-            ORDER BY DATE(shipment_created_date)
+            GROUP BY DATE_FORMAT(shipment_created_date, '%Y-%m-%d')
+            ORDER BY DATE_FORMAT(shipment_created_date, '%Y-%m-%d')
         """
 
     return """
         SELECT
-            DATE_FORMAT(DATE(shipment_created_date), '%Y-%m-%d') AS label,
+            DATE_FORMAT(shipment_created_date, '%Y-%m-%d') AS label,
             COUNT(*) AS shipments,
             COALESCE(SUM(profit), 0) AS profit,
             COALESCE(SUM(broker_price), 0) AS gross
@@ -193,8 +193,8 @@ def get_personal_breakdown_query(period: str):
           AND YEAR(shipment_created_date) = YEAR(%s)
           AND MONTH(shipment_created_date) = MONTH(%s)
           AND assigned_staff_id = %s
-        GROUP BY DATE(shipment_created_date)
-        ORDER BY DATE(shipment_created_date)
+        GROUP BY DATE_FORMAT(shipment_created_date, '%Y-%m-%d')
+        ORDER BY DATE_FORMAT(shipment_created_date, '%Y-%m-%d')
     """
 
 
@@ -334,13 +334,13 @@ def build_company_profit_history(cursor, period: str, limit: int):
 # =============================
 # DASHBOARDS
 # =============================
-def dispatcher_dashboard(staff_id: int):
+def personal_dashboard(staff_id: int):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
     try:
         return {
-            "type": "dispatcher_dashboard",
+            "type": "personal_dashboard",
             "days": build_personal_history(cursor, "day", 12, staff_id),
             "weeks": build_personal_history(cursor, "week", 12, staff_id),
             "months": build_personal_history(cursor, "month", 12, staff_id)
@@ -388,10 +388,15 @@ def company_profit():
 def build_dashboard(user: dict):
     job_title = str(user.get("job_title", "")).lower()
 
-    if job_title == "dispatcher":
-        return dispatcher_dashboard(user["staff_id"])
+    if job_title in ["dispatcher", "hr"]:
+        return personal_dashboard(user["staff_id"])
 
     if job_title in ["manager", "accounting", "supervisor"]:
         return company_dashboard()
 
-    return {"message": "No analytics available"}
+    return {
+        "type": "personal_dashboard",
+        "days": [],
+        "weeks": [],
+        "months": []
+    }

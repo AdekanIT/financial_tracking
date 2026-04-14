@@ -6,9 +6,6 @@ from utils.calculations import calculate_profit_and_margin
 from services.logging_service import log_shipment_change
 
 
-# =======================================================
-# ROLE CONFIG
-# =======================================================
 FULL_FINANCIAL_ROLES = {"manager", "supervisor", "accounting"}
 LIMITED_FINANCIAL_OWN_ONLY_ROLES = {"dispatcher"}
 NO_FINANCIAL_ROLES = {"hr", "tracking"}
@@ -22,9 +19,6 @@ SENSITIVE_FIELDS = [
 ]
 
 
-# =======================================================
-# HELPERS
-# =======================================================
 def validate_company(company_id: int):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -121,14 +115,6 @@ def normalize_job_title(job_title: str) -> str:
     return (job_title or "").strip().lower()
 
 
-def can_view_all_financials(current_user: dict) -> bool:
-    return normalize_job_title(current_user.get("job_title")) in FULL_FINANCIAL_ROLES
-
-
-def can_view_only_own_financials(current_user: dict) -> bool:
-    return normalize_job_title(current_user.get("job_title")) in LIMITED_FINANCIAL_OWN_ONLY_ROLES
-
-
 def should_hide_financials_for_shipment(current_user: dict, shipment: dict) -> bool:
     job_title = normalize_job_title(current_user.get("job_title"))
     current_staff_id = current_user.get("staff_id")
@@ -180,9 +166,6 @@ def fetch_all_non_deleted_shipments(cursor):
     return cursor.fetchall()
 
 
-# =======================================================
-# CREATE
-# =======================================================
 def create_shipment(data, staff_id):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -203,6 +186,8 @@ def create_shipment(data, staff_id):
 
         profit, margin = calculate_profit_and_margin(broker_price, driver_pay)
         company_reference = generate_company_reference(company_id)
+
+        shipment_created_date = data.get("shipment_created_date") or datetime.now()
 
         cursor.execute("""
             INSERT INTO shipments (
@@ -234,7 +219,7 @@ def create_shipment(data, staff_id):
                 payment_option,
                 comments
             )
-            VALUES (%s,%s,%s,%s,%s,%s,NOW(),
+            VALUES (%s,%s,%s,%s,%s,%s,%s,
                     %s,%s,%s,
                     %s,%s,%s,
                     %s,%s,%s,
@@ -247,6 +232,7 @@ def create_shipment(data, staff_id):
             data.get("unit_number"),
             assigned_staff_id,
             staff_full_name,
+            shipment_created_date,
             data.get("driver_name"),
             data.get("business_name"),
             data.get("broker_name"),
@@ -289,9 +275,6 @@ def create_shipment(data, staff_id):
         conn.close()
 
 
-# =======================================================
-# GET VISIBLE LIST
-# =======================================================
 def get_visible_shipments_service(current_user):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -305,23 +288,14 @@ def get_visible_shipments_service(current_user):
         conn.close()
 
 
-# =======================================================
-# LEGACY GET MY
-# =======================================================
 def get_my_shipments_service(current_user):
     return get_visible_shipments_service(current_user)
 
 
-# =======================================================
-# LEGACY GET ALL
-# =======================================================
 def get_all_shipments_service(current_user):
     return get_visible_shipments_service(current_user)
 
 
-# =======================================================
-# GET ONE
-# =======================================================
 def get_shipment_by_id(shipment_id, current_user):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -345,9 +319,6 @@ def get_shipment_by_id(shipment_id, current_user):
         conn.close()
 
 
-# =======================================================
-# GET LOGS
-# =======================================================
 def get_shipment_logs_service(shipment_id: int, current_user: dict):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -408,9 +379,7 @@ def get_shipment_logs_service(shipment_id: int, current_user: dict):
         cursor.close()
         conn.close()
 
-# =======================================================
-# UPDATE
-# =======================================================
+
 def update_shipment_service(shipment_id, data, current_user):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -518,9 +487,6 @@ def update_shipment_service(shipment_id, data, current_user):
         conn.close()
 
 
-# =======================================================
-# DELETE (SOFT)
-# =======================================================
 def delete_shipment_service(shipment_id, current_user):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)

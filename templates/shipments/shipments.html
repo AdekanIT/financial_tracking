@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Shipments</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=7">
+    <link rel="stylesheet" href="/static/css/style.css?v=8">
     <style>
         :root {
             color-scheme: dark;
@@ -1245,7 +1245,7 @@
                     <div class="filter-field">
                         <label for="filterCreatedDate">Created Date</label>
                         <div class="input-with-picker">
-                            <input id="filterCreatedDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
+                            <input id="filterCreatedDate" class="compact-input" type="text" placeholder="mm/dd/yyyy" autocomplete="off">
                             <button id="filterCreatedDatePickerBtn" class="picker-launch-btn" type="button" title="Pick date" aria-label="Pick created date">
                                 <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
                             </button>
@@ -1324,6 +1324,16 @@
 
             <div class="form-grid">
                 <div class="form-group">
+                    <label for="shipment_created_date">Created</label>
+                    <div class="input-with-picker">
+                        <input type="text" id="shipment_created_date" placeholder="mm/dd/yyyy" autocomplete="off" required>
+                        <button id="shipmentCreatedDatePickerBtn" class="picker-launch-btn" type="button" title="Pick created date">
+                            <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
                     <label for="external_reference">Broker Reference</label>
                     <input type="text" id="external_reference" placeholder="Enter broker reference" required>
                 </div>
@@ -1362,7 +1372,7 @@
                 <div class="form-group">
                     <label for="pickup_date">Pickup Date</label>
                     <div class="input-with-picker">
-                        <input type="text" id="pickup_date" placeholder="dd/mm/yyyy" autocomplete="off" required>
+                        <input type="text" id="pickup_date" placeholder="mm/dd/yyyy" autocomplete="off" required>
                         <button id="pickupDatePickerBtn" class="picker-launch-btn" type="button" title="Pick pickup date">
                             <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
                         </button>
@@ -1399,7 +1409,7 @@
                 <div class="form-group">
                     <label for="delivery_date">Delivery Date</label>
                     <div class="input-with-picker">
-                        <input type="text" id="delivery_date" placeholder="dd/mm/yyyy" autocomplete="off" required>
+                        <input type="text" id="delivery_date" placeholder="mm/dd/yyyy" autocomplete="off" required>
                         <button id="deliveryDatePickerBtn" class="picker-launch-btn" type="button" title="Pick delivery date">
                             <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
                         </button>
@@ -1622,6 +1632,6 @@
     </div>
 </div>
 
-<script src="/static/js/shipments.js?v=7"></script>
+<script src="/static/js/shipments.js?v=8"></script>
 </body>
 </html>

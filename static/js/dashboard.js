@@ -194,32 +194,198 @@ function getPeriodsArray() {
     return Array.isArray(dashboardPayload.months) ? dashboardPayload.months : [];
 }
 
-function getLatestPeriodBlock() {
+/* =========================
+   FIXED PERIOD SELECTION
+========================= */
+
+function toLocalDate(dateValue) {
+    const d = new Date(dateValue);
+    if (Number.isNaN(d.getTime())) return null;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function getTodayLocal() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function getStartOfWeek(dateValue) {
+    const d = new Date(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate());
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day; // Monday start
+    d.setDate(d.getDate() + diff);
+    return d;
+}
+
+function getEndOfWeek(dateValue) {
+    const start = getStartOfWeek(dateValue);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return end;
+}
+
+function isSameDay(dateA, dateB) {
+    return dateA && dateB &&
+        dateA.getFullYear() === dateB.getFullYear() &&
+        dateA.getMonth() === dateB.getMonth() &&
+        dateA.getDate() === dateB.getDate();
+}
+
+function isSameMonth(dateA, dateB) {
+    return dateA && dateB &&
+        dateA.getFullYear() === dateB.getFullYear() &&
+        dateA.getMonth() === dateB.getMonth();
+}
+
+function isDateInRange(dateValue, startDate, endDate) {
+    return dateValue && startDate && endDate && dateValue >= startDate && dateValue <= endDate;
+}
+
+function getBlockStartDate(block) {
+    const candidates = [
+        block?.period_start,
+        block?.start_date,
+        block?.from_date,
+        block?.date,
+        block?.day_date,
+        block?.week_start,
+        block?.month_start
+    ];
+
+    for (const value of candidates) {
+        const parsed = toLocalDate(value);
+        if (parsed) return parsed;
+    }
+
+    // fallback from label formats like 2026-04-14 or 2026-04
+    const label = String(block?.period_label || "").trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
+        return toLocalDate(label);
+    }
+
+    if (/^\d{4}-\d{2}$/.test(label)) {
+        return toLocalDate(`${label}-01`);
+    }
+
+    return null;
+}
+
+function getBlockEndDate(block) {
+    const candidates = [
+        block?.period_end,
+        block?.end_date,
+        block?.to_date,
+        block?.week_end,
+        block?.month_end
+    ];
+
+    for (const value of candidates) {
+        const parsed = toLocalDate(value);
+        if (parsed) return parsed;
+    }
+
+    const start = getBlockStartDate(block);
+    if (!start) return null;
+
+    if (currentPeriodType === "day") {
+        return new Date(start);
+    }
+
+    if (currentPeriodType === "week") {
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        return end;
+    }
+
+    // month fallback
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+    return end;
+}
+
+function getCurrentPeriodBlock() {
     const periods = getPeriodsArray();
     if (!periods.length) return null;
-    return periods[periods.length - 1];
+
+    const today = getTodayLocal();
+
+    // 1. exact current period match
+    if (currentPeriodType === "day") {
+        const exact = periods.find(block => {
+            const start = getBlockStartDate(block);
+            return isSameDay(start, today);
+        });
+        if (exact) return exact;
+    }
+
+    if (currentPeriodType === "week") {
+        const weekStart = getStartOfWeek(today);
+        const weekEnd = getEndOfWeek(today);
+
+        const exact = periods.find(block => {
+            const start = getBlockStartDate(block);
+            const end = getBlockEndDate(block);
+            if (!start || !end) return false;
+            return isDateInRange(today, start, end) ||
+                (isSameDay(start, weekStart) && isSameDay(end, weekEnd));
+        });
+        if (exact) return exact;
+    }
+
+    if (currentPeriodType === "month") {
+        const exact = periods.find(block => {
+            const start = getBlockStartDate(block);
+            return isSameMonth(start, today);
+        });
+        if (exact) return exact;
+    }
+
+    // 2. nearest past/current block, not future
+    const enriched = periods.map(block => {
+        const start = getBlockStartDate(block);
+        const end = getBlockEndDate(block) || start;
+        return { block, start, end };
+    }).filter(item => item.start);
+
+    const nonFuture = enriched.filter(item => item.start <= today || (item.end && item.end <= today));
+
+    if (nonFuture.length) {
+        nonFuture.sort((a, b) => a.start - b.start);
+        return nonFuture[nonFuture.length - 1].block;
+    }
+
+    // 3. fallback first available
+    return periods[0];
 }
+
+function getLatestPeriodBlock() {
+    return getCurrentPeriodBlock();
+}
+
+/* =========================
+   FIXED BREAKDOWN NORMALIZE
+========================= */
 
 function normalizeContributionBreakdown(periodBlock) {
     if (!periodBlock) return [];
 
+    let rows = [];
+
     if (Array.isArray(periodBlock.contribution_breakdown) && periodBlock.contribution_breakdown.length > 0) {
-        return periodBlock.contribution_breakdown.map(item => ({
+        rows = periodBlock.contribution_breakdown.map(item => ({
             staff_id: item.staff_id ?? null,
-            label: item.label || "Unknown",
+            label: item.label || item.staff_full_name || "Unknown",
             shipments: Number(item.shipments || 0),
             profit: Number(item.profit || 0),
             gross: Number(item.gross || 0),
             share_percent: Number(item.share_percent || 0)
         }));
-    }
-
-    if (Array.isArray(periodBlock.breakdown) && periodBlock.breakdown.length > 0) {
+    } else if (Array.isArray(periodBlock.breakdown) && periodBlock.breakdown.length > 0) {
         const total = periodBlock.breakdown.reduce((sum, item) => sum + Number(item.profit || 0), 0);
 
-        return periodBlock.breakdown.map(item => ({
-            staff_id: null,
-            label: item.label || "Unknown",
+        rows = periodBlock.breakdown.map(item => ({
+            staff_id: item.staff_id ?? null,
+            label: item.label || item.staff_full_name || "Unknown",
             shipments: Number(item.shipments || 0),
             profit: Number(item.profit || 0),
             gross: Number(item.gross || 0),
@@ -227,7 +393,85 @@ function normalizeContributionBreakdown(periodBlock) {
         }));
     }
 
-    return [];
+    return rows;
+}
+
+function getAllKnownStaffRows() {
+    const periods = [
+        ...(Array.isArray(dashboardPayload?.days) ? dashboardPayload.days : []),
+        ...(Array.isArray(dashboardPayload?.weeks) ? dashboardPayload.weeks : []),
+        ...(Array.isArray(dashboardPayload?.months) ? dashboardPayload.months : [])
+    ];
+
+    const staffMap = new Map();
+
+    periods.forEach(period => {
+        const breakdown = normalizeContributionBreakdown(period);
+        breakdown.forEach(item => {
+            const key = item.staff_id ?? item.label;
+            if (!staffMap.has(key)) {
+                staffMap.set(key, {
+                    staff_id: item.staff_id ?? null,
+                    label: item.label || "Unknown",
+                    shipments: 0,
+                    profit: 0,
+                    gross: 0,
+                    share_percent: 0
+                });
+            }
+        });
+    });
+
+    return Array.from(staffMap.values());
+}
+
+function buildFullBreakdownForSelectedPeriod() {
+    const currentBlock = getCurrentPeriodBlock();
+    const selectedRows = normalizeContributionBreakdown(currentBlock);
+    const allStaff = getAllKnownStaffRows();
+
+    const selectedMap = new Map();
+    selectedRows.forEach(item => {
+        selectedMap.set(item.staff_id ?? item.label, item);
+    });
+
+    const merged = allStaff.map(staff => {
+        const key = staff.staff_id ?? staff.label;
+        const current = selectedMap.get(key);
+
+        if (current) {
+            return {
+                staff_id: current.staff_id,
+                label: current.label,
+                shipments: Number(current.shipments || 0),
+                profit: Number(current.profit || 0),
+                gross: Number(current.gross || 0),
+                share_percent: Number(current.share_percent || 0)
+            };
+        }
+
+        return {
+            staff_id: staff.staff_id,
+            label: staff.label,
+            shipments: 0,
+            profit: 0,
+            gross: 0,
+            share_percent: 0
+        };
+    });
+
+    const totalProfit = merged.reduce((sum, item) => sum + Number(item.profit || 0), 0);
+
+    return merged
+        .map(item => ({
+            ...item,
+            share_percent: totalProfit > 0 ? (Number(item.profit || 0) / totalProfit) * 100 : 0
+        }))
+        .sort((a, b) => {
+            if (b.profit !== a.profit) return b.profit - a.profit;
+            if (b.shipments !== a.shipments) return b.shipments - a.shipments;
+            return String(a.label).localeCompare(String(b.label));
+        });
 }
 
 function getStableColorForIndex(index) {
@@ -259,7 +503,7 @@ function getCurrentColorMap() {
 }
 
 function updateSummaryCards() {
-    const latest = getLatestPeriodBlock();
+    const latest = getCurrentPeriodBlock();
 
     if (!latest) {
         if (totalProfitEl) totalProfitEl.textContent = "$0";
@@ -289,8 +533,7 @@ function createTextCell(text) {
 function renderTable() {
     if (!dispatcherTableBody) return;
 
-    const latest = getLatestPeriodBlock();
-    const breakdown = normalizeContributionBreakdown(latest);
+    const breakdown = buildFullBreakdownForSelectedPeriod();
 
     dispatcherTableBody.innerHTML = "";
 
@@ -305,9 +548,7 @@ function renderTable() {
         return;
     }
 
-    const sorted = [...breakdown].sort((a, b) => b.profit - a.profit);
-
-    sorted.forEach((item, index) => {
+    breakdown.forEach((item, index) => {
         const share = item.share_percent || 0;
         const tr = document.createElement("tr");
         tr.appendChild(createTextCell(index + 1));
@@ -322,8 +563,7 @@ function renderTable() {
 function renderLegend() {
     if (!legendListEl) return;
 
-    const latest = getLatestPeriodBlock();
-    const breakdown = normalizeContributionBreakdown(latest);
+    const breakdown = buildFullBreakdownForSelectedPeriod();
     const colorMap = getCurrentColorMap();
 
     legendListEl.innerHTML = "";
@@ -339,15 +579,13 @@ function renderLegend() {
         return;
     }
 
-    const sorted = [...breakdown].sort((a, b) => b.profit - a.profit);
-
-    sorted.forEach(item => {
+    breakdown.forEach((item, index) => {
         const wrapper = document.createElement("div");
         wrapper.className = "legend-item";
 
         const colorDot = document.createElement("span");
         colorDot.className = "legend-color";
-        colorDot.style.background = colorMap[item.label] || getStableColorForIndex(0);
+        colorDot.style.background = colorMap[item.label] || getStableColorForIndex(index);
 
         const content = document.createElement("div");
 
@@ -385,7 +623,7 @@ function renderLegend() {
 function updateChartTexts() {
     if (!analyticsSubtitleEl || !legendTitleEl || !legendSubtitleEl) return;
 
-    const latest = getLatestPeriodBlock();
+    const latest = getCurrentPeriodBlock();
     const periodLabel = latest?.period_label || "selected period";
 
     if (currentChartType === "doughnut") {
@@ -395,7 +633,7 @@ function updateChartTexts() {
         legendSubtitleEl.textContent = `Current selected period staff contribution · ${periodLabel}`;
     } else if (currentChartType === "line") {
         analyticsSubtitleEl.textContent =
-            `Trend shows company and staff profit movement across visible ${currentPeriodType} periods.`;
+            `Trend shows staff profit movement across visible ${currentPeriodType} periods.`;
         legendTitleEl.textContent = "Contribution Panel";
         legendSubtitleEl.textContent = "Switch to Contribution to see the current selected period split";
     } else {
@@ -437,16 +675,15 @@ function renderDoughnutChart() {
     const canvas = getCanvas();
     if (!canvas) return;
 
-    const latest = getLatestPeriodBlock();
-    const breakdown = normalizeContributionBreakdown(latest);
+    const latest = getCurrentPeriodBlock();
+    const breakdown = buildFullBreakdownForSelectedPeriod();
     if (!breakdown.length) return;
 
-    const sorted = [...breakdown].sort((a, b) => b.profit - a.profit);
     const colorMap = getCurrentColorMap();
 
-    const labels = sorted.map(item => item.label);
-    const values = sorted.map(item => Number(item.profit || 0));
-    const colors = sorted.map(item => colorMap[item.label]);
+    const labels = breakdown.map(item => item.label);
+    const values = breakdown.map(item => Number(item.profit || 0));
+    const colors = breakdown.map((item, index) => colorMap[item.label] || getStableColorForIndex(index));
 
     profitChartInstance = new Chart(canvas.getContext("2d"), {
         type: "doughnut",
@@ -487,7 +724,7 @@ function renderDoughnutChart() {
             }
         },
         plugins: [
-            renderCenterTextPlugin("Current Profit", formatCurrency(latest.profit || 0))
+            renderCenterTextPlugin("Current Profit", formatCurrency(latest?.profit || 0))
         ]
     });
 }
@@ -500,38 +737,24 @@ function renderLineChart() {
     if (!periods.length) return;
 
     const colorMap = getCurrentColorMap();
-    const staffNames = Object.keys(colorMap);
+    const allStaff = getAllKnownStaffRows();
+    const staffNames = allStaff.map(item => item.label);
 
-    const datasets = [{
-        label: "Company Total",
-        data: periods.map(item => Number(item.profit || 0)),
-        borderColor: CHART_COLORS.companyLine,
-        backgroundColor: CHART_COLORS.companyFill,
-        fill: true,
-        tension: 0.34,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        pointBackgroundColor: CHART_COLORS.point,
-        borderWidth: 3
-    }];
-
-    staffNames.forEach(name => {
-        datasets.push({
-            label: name,
-            data: periods.map(period => {
-                const breakdown = normalizeContributionBreakdown(period);
-                const matched = breakdown.find(item => item.label === name);
-                return matched ? Number(matched.profit || 0) : 0;
-            }),
-            borderColor: colorMap[name],
-            backgroundColor: colorMap[name],
-            fill: false,
-            tension: 0.30,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-            borderWidth: 2
-        });
-    });
+    const datasets = staffNames.map((name, index) => ({
+        label: name,
+        data: periods.map(period => {
+            const breakdown = normalizeContributionBreakdown(period);
+            const matched = breakdown.find(item => item.label === name);
+            return matched ? Number(matched.profit || 0) : 0;
+        }),
+        borderColor: colorMap[name] || getStableColorForIndex(index),
+        backgroundColor: colorMap[name] || getStableColorForIndex(index),
+        fill: false,
+        tension: 0.30,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        borderWidth: 2
+    }));
 
     profitChartInstance = new Chart(canvas.getContext("2d"), {
         type: "line",
@@ -570,40 +793,17 @@ function renderStackedBarChart() {
     if (!periods.length) return;
 
     const colorMap = getCurrentColorMap();
-    const staffNames = Object.keys(colorMap);
+    const allStaff = getAllKnownStaffRows();
+    const staffNames = allStaff.map(item => item.label);
 
-    if (!staffNames.length) {
-        profitChartInstance = new Chart(canvas.getContext("2d"), {
-            type: "bar",
-            data: {
-                labels: periods.map(item => item.period_label),
-                datasets: [{
-                    label: "Profit",
-                    data: periods.map(item => Number(item.profit || 0)),
-                    backgroundColor: "rgba(59, 130, 246, 0.95)",
-                    borderRadius: 8,
-                    maxBarThickness: 48
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: BASE_ANIMATION,
-                plugins: { legend: baseLegendConfig(true) },
-                scales: baseScalesConfig(false)
-            }
-        });
-        return;
-    }
-
-    const datasets = staffNames.map(name => ({
+    const datasets = staffNames.map((name, index) => ({
         label: name,
         data: periods.map(period => {
             const breakdown = normalizeContributionBreakdown(period);
             const matched = breakdown.find(item => item.label === name);
             return matched ? Number(matched.profit || 0) : 0;
         }),
-        backgroundColor: colorMap[name],
+        backgroundColor: colorMap[name] || getStableColorForIndex(index),
         borderRadius: 8,
         maxBarThickness: 48
     }));

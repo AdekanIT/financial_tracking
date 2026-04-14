@@ -20,12 +20,11 @@ from data.db import get_current_user, require_roles
 router = APIRouter(prefix="/shipments", tags=["Shipments"])
 
 
-# =======================================================
-# REQUEST MODELS
-# =======================================================
 class ShipmentCreate(BaseModel):
     company_id: int
     assigned_staff_id: Optional[int] = None
+    shipment_created_date: Optional[datetime] = None
+
     unit_number: Optional[str] = None
     external_reference: Optional[str] = None
     driver_name: Optional[str] = None
@@ -53,6 +52,8 @@ class ShipmentUpdate(BaseModel):
     company_id: Optional[int] = None
     company_reference: Optional[str] = None
     assigned_staff_id: Optional[int] = None
+    shipment_created_date: Optional[datetime] = None
+
     unit_number: Optional[str] = None
     external_reference: Optional[str] = None
     driver_name: Optional[str] = None
@@ -79,9 +80,6 @@ class ShipmentDelete(BaseModel):
     shipment_id: int
 
 
-# =======================================================
-# CREATE
-# =======================================================
 @router.post("/create")
 def create_new_shipment(
     data: ShipmentCreate,
@@ -90,9 +88,6 @@ def create_new_shipment(
     return create_shipment(data.model_dump(), current_user["staff_id"])
 
 
-# =======================================================
-# VISIBLE LIST
-# =======================================================
 @router.get("/visible")
 def get_visible_shipments(
     current_user: dict = Depends(get_current_user)
@@ -100,9 +95,6 @@ def get_visible_shipments(
     return get_visible_shipments_service(current_user)
 
 
-# =======================================================
-# GET MY
-# =======================================================
 @router.get("/my")
 def get_my_shipments(
     current_user: dict = Depends(get_current_user)
@@ -110,9 +102,6 @@ def get_my_shipments(
     return get_my_shipments_service(current_user)
 
 
-# =======================================================
-# GET ALL
-# =======================================================
 @router.get("/all")
 def get_all_shipments(
     current_user: dict = Depends(get_current_user)
@@ -120,9 +109,6 @@ def get_all_shipments(
     return get_all_shipments_service(current_user)
 
 
-# =======================================================
-# GET LOGS
-# =======================================================
 @router.get("/logs/{shipment_id}")
 def get_shipment_logs(
     shipment_id: int,
@@ -131,9 +117,6 @@ def get_shipment_logs(
     return get_shipment_logs_service(shipment_id, current_user)
 
 
-# =======================================================
-# GET ONE
-# =======================================================
 @router.get("/{shipment_id}")
 def get_one_shipment(
     shipment_id: int,
@@ -142,9 +125,6 @@ def get_one_shipment(
     return get_shipment_by_id(shipment_id, current_user)
 
 
-# =======================================================
-# UPDATE
-# =======================================================
 @router.put("/update")
 def update_shipment(
     data: ShipmentUpdate,
@@ -160,10 +140,6 @@ def update_shipment(
     )
 
 
-# =======================================================
-# DELETE (SOFT)
-# compatible with current frontend
-# =======================================================
 @router.delete("/delete/{shipment_id}")
 def delete_shipment_by_path(
     shipment_id: int,
@@ -186,10 +162,6 @@ def delete_shipment_by_body(
     )
 
 
-# =======================================================
-# LEGACY DELETE
-# kept for compatibility
-# =======================================================
 @router.put("/delete")
 def delete_shipment_legacy(
     data: ShipmentDelete,
