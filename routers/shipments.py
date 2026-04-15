@@ -85,7 +85,7 @@ def create_new_shipment(
     data: ShipmentCreate,
     current_user: dict = Depends(require_roles(["manager", "supervisor", "accounting", "dispatcher"]))
 ):
-    return create_shipment(data.model_dump(), current_user["staff_id"])
+    return create_shipment(data.model_dump(), current_user["staff_id"], current_user)
 
 
 @router.get("/visible")
@@ -102,9 +102,10 @@ def get_my_shipments(
     return get_my_shipments_service(current_user)
 
 
+# archive usage
 @router.get("/all")
 def get_all_shipments(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_roles(["manager", "supervisor", "hr", "accounting"]))
 ):
     return get_all_shipments_service(current_user)
 

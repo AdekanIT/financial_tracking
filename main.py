@@ -45,7 +45,6 @@ def salary_page(request: Request):
     return templates.TemplateResponse("salary/salary.html", {"request": request})
 
 
-# ✅ NEW ROUTE — Excel Preview Page
 @app.get("/excel")
 def excel_page(request: Request):
     return templates.TemplateResponse("salary/excel.html", {"request": request})

@@ -83,21 +83,31 @@ def change_status_endpoint(
 
 # =====================================================
 # GET ALL USERS
-# manager + hr
+# manager + supervisor + hr
 # =====================================================
 @router.get("/all")
 def get_all_users_endpoint(
-    current_user: dict = Depends(require_roles(["manager", "hr"]))
+    current_user: dict = Depends(require_roles(["manager", "supervisor", "hr"]))
 ):
-    return get_all_users()
+    result = get_all_users()
+
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return result
 
 
 # =====================================================
 # GET USER LOGS
-# manager + hr
+# manager + supervisor + hr
 # =====================================================
 @router.get("/logs")
 def get_user_logs_endpoint(
-    current_user: dict = Depends(require_roles(["manager", "hr"]))
+    current_user: dict = Depends(require_roles(["manager", "supervisor", "hr"]))
 ):
-    return get_user_logs()
+    result = get_user_logs()
+
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return result

@@ -15,6 +15,25 @@ const RESTRICTED_FINANCIAL_KEYS = new Set([
 
 const PRIVILEGED_ROLES = new Set(["manager", "supervisor", "accounting"]);
 
+const SHIPMENT_STATUS_OPTIONS = [
+    { value: "created", label: "Created" },
+    { value: "picked_up", label: "Picked Up" },
+    { value: "in_transit", label: "In Transit" },
+    { value: "delivered", label: "Delivered" },
+    { value: "tonu", label: "TONU" }
+];
+
+const DRIVER_PAYMENT_STATUS_OPTIONS = [
+    { value: "unpaid", label: "Unpaid" },
+    { value: "paid", label: "Paid" }
+];
+
+const BROKER_PAYMENT_OPTION_OPTIONS = [
+    { value: "", label: "Select payment option" },
+    { value: "standard", label: "Standard Payment" },
+    { value: "quick_pay", label: "Broker Quick Pay" }
+];
+
 let shipmentsTable, shipmentsHeaderRow, logoutBtn, shipmentModal, shipmentForm, shipmentLogsModal;
 let brokerPriceInput, driverPayInput, calculatedProfitBox, resetColumnsBtn;
 let columnToolbar, toggleColumnsBtn, filtersPanel, toggleFiltersBtn, timeFormatSelect, timeFormatDisplay, toggleSidebarBtn;
@@ -26,21 +45,6 @@ let filterCreatedDatePickerBtn, filterMonthPickerBtn, pickupDatePickerBtn, deliv
 let editOnlyShipmentStatus, editOnlyPaymentStatus;
 let pickupTimeInput, deliveryTimeInput;
 
-let datePickerModal, datePrevMonthBtn, dateNextMonthBtn, dateGrid, dateCurrentMonthLabel, dateCloseBtn, dateClearBtn, dateModalTitle;
-let datePickerTargetInputId = null;
-let datePickerViewDate = new Date();
-
-let monthPickerModal, monthPrevYearBtn, monthNextYearBtn, monthGrid, monthCurrentYearLabel, monthCloseBtn, monthClearBtn;
-let monthPickerViewYear = new Date().getFullYear();
-
-let timePickerModal, timeModalTitle, timeHourUpBtn, timeHourDownBtn, timeMinuteUpBtn, timeMinuteDownBtn;
-let timeHourDisplay, timeMinuteDisplay, timeAmBtn, timePmBtn, timePreviewBox, timeClearBtn, timeCloseBtn, timeApplyBtn;
-let timePickerTargetInputId = null;
-let timePickerState = { hour: 12, minute: 0, ampm: "AM" };
-
-let timeFormatModal, formatCloseBtn;
-let formatOptionButtons = [];
-
 let floatingActionMenu;
 let floatingActionMenuOpen = false;
 
@@ -49,10 +53,20 @@ let cancelDeleteShipmentBtn;
 let confirmDeleteShipmentBtn;
 let pendingDeleteShipmentId = null;
 
+let customSelectModal;
+let customSelectTitle;
+let customSelectSubtitle;
+let customSelectSearch;
+let customSelectList;
+let customSelectCloseBtn;
+let currentCustomSelectHandler = null;
+let currentCustomSelectItems = [];
+
 let isCreating = false;
 let draggedColumnKey = null;
 let allShipments = [];
 let filteredShipments = [];
+let managerStaffList = [];
 
 const STATE_OPTIONS = [
     "AL - Alabama", "AK - Alaska", "AZ - Arizona", "AR - Arkansas", "CA - California",
@@ -131,8 +145,7 @@ const STATUS_CLASS_MAP = {
     in_transit: "status-in_transit",
     delivered: "status-delivered",
     tonu: "status-tonu",
-    canceled: "status-canceled",
-    cancelled: "status-canceled"
+    deleted: "status-canceled"
 };
 
 let currentColumns = loadColumnsFromStorage();
@@ -160,10 +173,6 @@ function getCurrentUserId() {
     return Number(user?.staff_id || user?.id || 0);
 }
 
-function isPrivilegedRole() {
-    return PRIVILEGED_ROLES.has(getCurrentUserRole());
-}
-
 function clearAuthAndRedirect() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -174,6 +183,18 @@ function logout() {
     clearAuthAndRedirect();
 }
 
+function toggleSidebar() {
+    document.body.classList.toggle("sidebar-collapsed");
+}
+
+function isPrivilegedRole() {
+    return PRIVILEGED_ROLES.has(getCurrentUserRole());
+}
+
+function isManagerRole() {
+    return getCurrentUserRole() === "manager";
+}
+
 async function fetchWithAuth(url, options = {}) {
     const token = getToken();
 
@@ -182,15 +203,20 @@ async function fetchWithAuth(url, options = {}) {
         return null;
     }
 
+    const headers = {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`
+    };
+
+    if (!(options.body instanceof FormData)) {
+        headers["Content-Type"] = "application/json";
+    }
+
     let response;
     try {
         response = await fetch(url, {
             ...options,
-            headers: {
-                ...(options.headers || {}),
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json"
-            }
+            headers
         });
     } catch (err) {
         console.error("Network error:", err);
@@ -207,6 +233,25 @@ async function fetchWithAuth(url, options = {}) {
 
 function getShipmentsEndpoint() {
     return `${API_BASE_URL}/shipments/visible`;
+}
+
+function hideSidebarLinkByHref(href) {
+    document.querySelectorAll(`a.nav-link[href="${href}"]`).forEach((el) => {
+        el.style.display = "none";
+    });
+}
+
+function setSidebarLinkVisibility(href, allowedRoles) {
+    const role = getCurrentUserRole();
+
+    document.querySelectorAll(`a.nav-link[href="${href}"]`).forEach((el) => {
+        el.style.display = allowedRoles.includes(role) ? "" : "none";
+    });
+}
+
+function applySidebarRoleVisibility() {
+    setSidebarLinkVisibility("/users", ["manager"]);
+    setSidebarLinkVisibility("/archive", ["manager", "supervisor", "hr", "accounting"]);
 }
 
 function getTimeFormat() {
@@ -227,10 +272,6 @@ function syncTimeFormatUI() {
 
     if (timeFormatSelect) timeFormatSelect.value = format;
     if (timeFormatDisplay) timeFormatDisplay.value = getTimeFormatLabel(format);
-
-    formatOptionButtons.forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.formatValue === format);
-    });
 }
 
 function formatCurrencyOrDash(value) {
@@ -626,92 +667,86 @@ function populateStateSelect(selectId) {
     });
 }
 
-function openDeleteShipmentModal(id) {
-    pendingDeleteShipmentId = id;
-    if (confirmDeleteShipmentModal) {
-        confirmDeleteShipmentModal.style.display = "flex";
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function canViewFinancials(item) {
+    const role = getCurrentUserRole();
+    const currentUserId = getCurrentUserId();
+
+    if (PRIVILEGED_ROLES.has(role)) return true;
+    if (role === "dispatcher") {
+        return Number(item?.assigned_staff_id || 0) === currentUserId;
+    }
+    return false;
+}
+
+function getCellValue(item, key) {
+    switch (key) {
+        case "shipment_created_date":
+            return formatDateOnly(item.shipment_created_date);
+        case "pickup_datetime":
+        case "delivery_datetime":
+            return formatDateTime(item[key]);
+        case "broker_price":
+        case "driver_pay":
+        case "profit":
+            return formatCurrencyOrDash(item[key]);
+        case "percentage_of_margin":
+        case "dispatcher_commission_percent":
+            return item[key] === null || item[key] === undefined || item[key] === ""
+                ? "—"
+                : `${Number(item[key]).toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2
+                })}%`;
+        case "miles":
+        case "loads_per_day":
+            return formatNumberOrDash(item[key]);
+        default:
+            return item[key] ?? "—";
     }
 }
 
-function closeDeleteShipmentModal() {
-    pendingDeleteShipmentId = null;
-    if (confirmDeleteShipmentModal) {
-        confirmDeleteShipmentModal.style.display = "none";
+function createLocationNode(text, type, shipmentStatus) {
+    const span = document.createElement("span");
+    const status = String(shipmentStatus || "").toLowerCase();
+
+    let done = false;
+    if (type === "pickup") {
+        done = ["picked_up", "in_transit", "delivered"].includes(status);
+    } else {
+        done = ["delivered"].includes(status);
     }
+
+    span.className = `location-pill ${done ? "loc-done" : "loc-pending"}`;
+    span.textContent = text || "—";
+    span.title = text || "—";
+    return span;
 }
 
-async function executeDeleteShipment() {
-    if (!pendingDeleteShipmentId) return;
-
-    try {
-        let response = await fetchWithAuth(`${API_BASE_URL}/shipments/delete/${pendingDeleteShipmentId}`, {
-            method: "DELETE"
-        });
-
-        if (!response || response.status === 404 || response.status === 405) {
-            response = await fetchWithAuth(`${API_BASE_URL}/shipments/delete`, {
-                method: "DELETE",
-                body: JSON.stringify({ shipment_id: pendingDeleteShipmentId })
-            });
-        }
-
-        closeDeleteShipmentModal();
-        await loadShipments();
-    } catch (e) {
-        console.error(e);
-    }
+function showTableLoading(message = "Loading shipments...") {
+    if (!shipmentsTable) return;
+    shipmentsTable.innerHTML = `
+        <tr>
+            <td colspan="${Math.max(getVisibleColumns().length, 1)}" class="empty-row">${message}</td>
+        </tr>
+    `;
 }
 
-async function deleteShipment(shipmentId) {
-    openDeleteShipmentModal(shipmentId);
-}
-
-function openCreateModal() {
-    resetShipmentForm();
-    document.getElementById("edit_shipment_id").value = "";
-    shipmentModalTitle.textContent = "Create Shipment";
-    shipmentSubmitBtn.textContent = "Save";
-    shipmentSubmitBtn.disabled = false;
-    editOnlyShipmentStatus.style.display = "none";
-    editOnlyPaymentStatus.style.display = "none";
-    openModal();
-}
-
-function openModal() {
-    if (shipmentModal) shipmentModal.style.display = "flex";
-}
-
-function closeModal() {
-    if (shipmentModal) shipmentModal.style.display = "none";
-}
-
-function openLogsModal() {
-    if (shipmentLogsModal) shipmentLogsModal.style.display = "flex";
-}
-
-function closeLogsModal() {
-    if (shipmentLogsModal) shipmentLogsModal.style.display = "none";
-}
-
-window.openModal = openModal;
-window.closeModal = closeModal;
-window.openCreateModal = openCreateModal;
-window.closeLogsModal = closeLogsModal;
-
-function calculateProfit() {
-    if (!brokerPriceInput || !driverPayInput || !calculatedProfitBox) return;
-
-    const broker = Number(brokerPriceInput.value) || 0;
-    const driver = Number(driverPayInput.value) || 0;
-    const profit = broker - driver;
-
-    calculatedProfitBox.textContent = `Profit: $${profit.toLocaleString()}`;
-}
-
-function getStatusClass(status) {
-    const key = (status || "").toLowerCase();
-    const modifier = STATUS_CLASS_MAP[key] || "status-created";
-    return `shipment-status ${modifier}`;
+function showTableError(message = "Failed to load shipments.") {
+    if (!shipmentsTable) return;
+    shipmentsTable.innerHTML = `
+        <tr>
+            <td colspan="${Math.max(getVisibleColumns().length, 1)}" class="empty-row">${message}</td>
+        </tr>
+    `;
 }
 
 function createTextCell(text, extraClass = "") {
@@ -790,10 +825,6 @@ function renderHeader() {
     }
 }
 
-function findColumnByKey(key) {
-    return currentColumns.find(col => col.key === key);
-}
-
 function removeColumnByKey(key) {
     const idx = currentColumns.findIndex(col => col.key === key);
     if (idx >= 0) {
@@ -805,7 +836,6 @@ function removeColumnByKey(key) {
 function moveColumnToVisible(key, targetIndex = null) {
     const column = removeColumnByKey(key);
     if (!column) return;
-
     column.visible = true;
 
     const visible = getVisibleColumns();
@@ -823,7 +853,6 @@ function moveColumnToVisible(key, targetIndex = null) {
 function moveColumnToHidden(key, targetIndex = null) {
     const column = removeColumnByKey(key);
     if (!column) return;
-
     column.visible = false;
 
     const visible = getVisibleColumns();
@@ -834,32 +863,6 @@ function moveColumnToHidden(key, targetIndex = null) {
     } else {
         hidden.splice(targetIndex, 0, column);
     }
-
-    currentColumns = [...visible, ...hidden];
-}
-
-function reorderWithinVisible(key, targetIndex) {
-    const visible = getVisibleColumns();
-    const hidden = getHiddenColumns();
-    const fromIndex = visible.findIndex(col => col.key === key);
-
-    if (fromIndex < 0) return;
-
-    const [moved] = visible.splice(fromIndex, 1);
-    visible.splice(targetIndex, 0, moved);
-
-    currentColumns = [...visible, ...hidden];
-}
-
-function reorderWithinHidden(key, targetIndex) {
-    const visible = getVisibleColumns();
-    const hidden = getHiddenColumns();
-    const fromIndex = hidden.findIndex(col => col.key === key);
-
-    if (fromIndex < 0) return;
-
-    const [moved] = hidden.splice(fromIndex, 1);
-    hidden.splice(targetIndex, 0, moved);
 
     currentColumns = [...visible, ...hidden];
 }
@@ -890,35 +893,14 @@ function createColumnChip(col, index, zoneType) {
 
     chip.addEventListener("dragend", () => {
         chip.classList.remove("dragging");
-        draggedColumnKey = null;
     });
 
-    chip.addEventListener("dragover", (e) => e.preventDefault());
-
-    chip.addEventListener("drop", (e) => {
-        e.preventDefault();
-        if (!draggedColumnKey || draggedColumnKey === col.key) return;
-
+    chip.addEventListener("dblclick", () => {
         if (zoneType === "visible") {
-            const draggedCol = findColumnByKey(draggedColumnKey);
-            if (!draggedCol) return;
-
-            if (draggedCol.visible) {
-                reorderWithinVisible(draggedColumnKey, index);
-            } else {
-                moveColumnToVisible(draggedColumnKey, index);
-            }
+            moveColumnToHidden(col.key);
         } else {
-            const draggedCol = findColumnByKey(draggedColumnKey);
-            if (!draggedCol) return;
-
-            if (draggedCol.visible) {
-                moveColumnToHidden(draggedColumnKey, index);
-            } else {
-                reorderWithinHidden(draggedColumnKey, index);
-            }
+            moveColumnToVisible(col.key);
         }
-
         saveColumnsToStorage();
         renderColumnManager();
         renderHeader();
@@ -928,7 +910,7 @@ function createColumnChip(col, index, zoneType) {
     return chip;
 }
 
-function setupZoneDrop(zoneEl, zoneType) {
+function setupDropZone(zoneEl, zoneType) {
     if (!zoneEl) return;
 
     zoneEl.addEventListener("dragover", (e) => {
@@ -946,19 +928,17 @@ function setupZoneDrop(zoneEl, zoneType) {
 
         if (!draggedColumnKey) return;
 
-        const draggedCol = findColumnByKey(draggedColumnKey);
-        if (!draggedCol) return;
-
         if (zoneType === "visible") {
-            if (!draggedCol.visible) moveColumnToVisible(draggedColumnKey);
+            moveColumnToVisible(draggedColumnKey);
         } else {
-            if (draggedCol.visible) moveColumnToHidden(draggedColumnKey);
+            moveColumnToHidden(draggedColumnKey);
         }
 
         saveColumnsToStorage();
         renderColumnManager();
         renderHeader();
         renderShipmentsTable(filteredShipments);
+        draggedColumnKey = null;
     });
 }
 
@@ -968,156 +948,13 @@ function renderColumnManager() {
     visibleColumnList.innerHTML = "";
     hiddenColumnList.innerHTML = "";
 
-    const visible = getVisibleColumns();
-    const hidden = getHiddenColumns();
-
-    visible.forEach((col, index) => {
+    getVisibleColumns().forEach((col, index) => {
         visibleColumnList.appendChild(createColumnChip(col, index, "visible"));
     });
 
-    hidden.forEach((col, index) => {
+    getHiddenColumns().forEach((col, index) => {
         hiddenColumnList.appendChild(createColumnChip(col, index, "hidden"));
     });
-}
-
-function toggleColumnToolbar() {
-    if (!columnToolbar) return;
-    columnToolbar.classList.toggle("open");
-}
-
-function toggleFiltersPanel() {
-    if (!filtersPanel) return;
-    filtersPanel.classList.toggle("open");
-}
-
-function toggleSidebar() {
-    document.body.classList.toggle("sidebar-collapsed");
-}
-
-function showTableLoading() {
-    if (!shipmentsTable) return;
-
-    shipmentsTable.innerHTML = "";
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = Math.max(getVisibleColumns().length, 1);
-    td.className = "empty-row";
-    td.textContent = "Loading shipments...";
-    tr.appendChild(td);
-    shipmentsTable.appendChild(tr);
-}
-
-function showTableError(message) {
-    if (!shipmentsTable) return;
-
-    shipmentsTable.innerHTML = "";
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = Math.max(getVisibleColumns().length, 1);
-    td.className = "empty-row";
-    td.textContent = message || "Failed to load shipments.";
-    tr.appendChild(td);
-    shipmentsTable.appendChild(tr);
-}
-
-function getLocationClass(type, shipmentStatus) {
-    const status = (shipmentStatus || "").toLowerCase();
-
-    if (type === "pickup") {
-        return ["picked_up", "in_transit", "delivered"].includes(status) ? "loc-done" : "loc-pending";
-    }
-
-    if (type === "delivery") {
-        return status === "delivered" ? "loc-done" : "loc-pending";
-    }
-
-    return "loc-pending";
-}
-
-function createLocationNode(text, type, shipmentStatus) {
-    const span = document.createElement("span");
-    span.className = `location-pill ${getLocationClass(type, shipmentStatus)}`;
-    span.textContent = text || "—";
-    span.title = text || "—";
-    return span;
-}
-
-function canViewFinancials(item) {
-    if (isPrivilegedRole()) return true;
-
-    const currentUserId = getCurrentUserId();
-    if (!currentUserId) return false;
-
-    const possibleOwnerIds = [
-        Number(item?.assigned_staff_id || 0),
-        Number(item?.created_by || 0),
-        Number(item?.staff_id || 0)
-    ].filter(Boolean);
-
-    return possibleOwnerIds.includes(currentUserId);
-}
-
-function getCellValue(item, key) {
-    switch (key) {
-        case "company_reference":
-            return item.company_reference || "—";
-        case "external_reference":
-            return item.external_reference || "—";
-        case "shipment_created_date":
-            return formatDateOnly(item.shipment_created_date);
-        case "unit_number":
-            return item.unit_number || "—";
-        case "driver_name":
-            return item.driver_name || "—";
-        case "business_name":
-            return item.business_name || "—";
-        case "broker_name":
-            return item.broker_name || "—";
-        case "pickup_city":
-            return item.pickup_city || "—";
-        case "pickup_state":
-            return item.pickup_state || "—";
-        case "pickup_datetime":
-            return formatDateTime(item.pickup_datetime);
-        case "delivery_city":
-            return item.delivery_city || "—";
-        case "delivery_state":
-            return item.delivery_state || "—";
-        case "delivery_datetime":
-            return formatDateTime(item.delivery_datetime);
-        case "miles":
-            return formatNumberOrDash(item.miles);
-        case "broker_price":
-            return formatCurrencyOrDash(item.broker_price);
-        case "driver_pay":
-            return formatCurrencyOrDash(item.driver_pay);
-        case "profit":
-            return formatCurrencyOrDash(item.profit);
-        case "percentage_of_margin":
-            return item.percentage_of_margin !== null && item.percentage_of_margin !== undefined
-                ? `${Number(item.percentage_of_margin).toLocaleString(undefined, {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 2
-                })}%`
-                : "—";
-        case "loads_per_day":
-            return formatNumberOrDash(item.loads_per_day);
-        case "dispatcher_commission_percent":
-            return item.dispatcher_commission_percent !== null && item.dispatcher_commission_percent !== undefined
-                ? `${Number(item.dispatcher_commission_percent).toLocaleString(undefined, {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 2
-                })}%`
-                : "—";
-        case "staff_full_name":
-            return item.staff_full_name || "—";
-        case "payment_status":
-            return item.payment_status || "—";
-        case "comments":
-            return item.comments || "—";
-        default:
-            return "—";
-    }
 }
 
 function closeFloatingActionMenu() {
@@ -1126,15 +963,6 @@ function closeFloatingActionMenu() {
     floatingActionMenu.innerHTML = "";
     floatingActionMenuOpen = false;
     delete floatingActionMenu.dataset.shipmentId;
-}
-
-function escapeHtml(value) {
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
 }
 
 function appendFloatingMenuButton(text, onClick, danger = false) {
@@ -1176,264 +1004,17 @@ function getNextStatusActions(currentStatus) {
     return [];
 }
 
-async function updateShipmentStatus(shipmentId, newStatus) {
-    try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/shipments/update`, {
-            method: "PUT",
-            body: JSON.stringify({
-                shipment_id: shipmentId,
-                shipment_status: newStatus
-            })
-        });
-
-        if (!response) return;
-
-        let result = {};
-        try {
-            result = await response.json();
-        } catch {}
-
-        if (!response.ok) {
-            alert(result.detail || "Failed to update shipment status.");
-            return;
-        }
-
-        await loadShipments();
-    } catch (err) {
-        console.error("Status update error:", err);
-        alert("Server error while updating shipment status.");
-    }
-}
-
-async function fetchShipmentLogs(shipmentId) {
-    const attempts = [
-        {
-            url: `${API_BASE_URL}/shipments/logs/${shipmentId}`,
-            options: { method: "GET" }
-        },
-        {
-            url: `${API_BASE_URL}/shipments/logs?shipment_id=${shipmentId}`,
-            options: { method: "GET" }
-        },
-        {
-            url: `${API_BASE_URL}/shipments/logs`,
-            options: {
-                method: "POST",
-                body: JSON.stringify({ shipment_id: shipmentId })
-            }
-        }
-    ];
-
-    for (const attempt of attempts) {
-        const response = await fetchWithAuth(attempt.url, attempt.options);
-        if (!response) continue;
-        if (response.ok) {
-            try {
-                return await response.json();
-            } catch {
-                return [];
-            }
-        }
-    }
-
-    return null;
-}
-
-function renderLogs(logs, shipmentId) {
-    shipmentLogsTitle.textContent = `Shipment Logs #${shipmentId}`;
-    shipmentLogsContainer.innerHTML = "";
-
-    if (!Array.isArray(logs) || logs.length === 0) {
-        shipmentLogsContainer.innerHTML = `<div class="empty-logs">No logs found for this shipment.</div>`;
-        return;
-    }
-
-    logs.forEach(log => {
-        const card = document.createElement("div");
-        card.className = "log-card";
-
-        const userName =
-            log.changed_by_name ||
-            log.staff_full_name ||
-            log.user_full_name ||
-            log.username ||
-            "Unknown User";
-
-        const changedAt =
-            formatDateTime(log.changed_at || log.created_at || log.log_created_at || log.timestamp || log.updated_at);
-
-        const fieldName =
-            log.field_name ||
-            log.changed_field ||
-            log.action ||
-            "Change";
-
-        const oldValue =
-            log.old_value === null || log.old_value === undefined || log.old_value === ""
-                ? "—"
-                : String(log.old_value);
-
-        const newValue =
-            log.new_value === null || log.new_value === undefined || log.new_value === ""
-                ? "—"
-                : String(log.new_value);
-
-        card.innerHTML = `
-            <div class="log-card-top">
-                <div class="log-user">${escapeHtml(userName)}</div>
-                <div class="log-date">${escapeHtml(changedAt)}</div>
-            </div>
-            <div class="log-field">${escapeHtml(fieldName)}</div>
-            <div class="log-values">
-                <div class="log-value-box"><strong>Old:</strong> ${escapeHtml(oldValue)}</div>
-                <div class="log-value-box"><strong>New:</strong> ${escapeHtml(newValue)}</div>
-            </div>
-        `;
-
-        shipmentLogsContainer.appendChild(card);
-    });
-}
-
-async function openShipmentLogs(item) {
-    openLogsModal();
-    shipmentLogsTitle.textContent = `Shipment Logs #${item.shipment_id}`;
-    shipmentLogsContainer.innerHTML = `<div class="empty-logs">Loading logs...</div>`;
-
-    const logs = await fetchShipmentLogs(item.shipment_id);
-
-    if (logs === null) {
-        shipmentLogsContainer.innerHTML = `
-            <div class="empty-logs">
-                Failed to load logs. If your backend endpoint name is different, update fetchShipmentLogs().
-            </div>
-        `;
-        return;
-    }
-
-    renderLogs(logs, item.shipment_id);
-}
-
-function saveBrokerNameToHistory(name) {
-    if (!name) return;
-
-    try {
-        const raw = localStorage.getItem(BROKER_NAMES_KEY);
-        const list = raw ? JSON.parse(raw) : [];
-        const normalized = String(name).trim();
-        if (!normalized) return;
-
-        const filtered = list.filter(item => item.toLowerCase() !== normalized.toLowerCase());
-        filtered.unshift(normalized);
-
-        localStorage.setItem(BROKER_NAMES_KEY, JSON.stringify(filtered.slice(0, 50)));
-    } catch {}
-}
-
-function renderBrokerNameSuggestions() {
-    const datalist = document.getElementById("brokerNameSuggestions");
-    if (!datalist) return;
-
-    datalist.innerHTML = "";
-
-    try {
-        const raw = localStorage.getItem(BROKER_NAMES_KEY);
-        const list = raw ? JSON.parse(raw) : [];
-
-        list.forEach(name => {
-            const option = document.createElement("option");
-            option.value = name;
-            datalist.appendChild(option);
-        });
-    } catch {}
-}
-
-function fillShipmentForm(item) {
-    document.getElementById("edit_shipment_id").value = item.shipment_id || "";
-
-    const createdDateEl = document.getElementById("shipment_created_date");
-    if (createdDateEl) {
-        createdDateEl.value = formatDateToSlash(item.shipment_created_date);
-        createdDateEl.classList.remove("field-error");
-    }
-
-    document.getElementById("external_reference").value = item.external_reference ?? "";
-    document.getElementById("unit_number").value = item.unit_number ?? "";
-    document.getElementById("driver_name").value = item.driver_name ?? "";
-    document.getElementById("business_name").value = item.business_name ?? "";
-    document.getElementById("broker_name").value = item.broker_name ?? "";
-    document.getElementById("pickup_city").value = item.pickup_city ?? "";
-    document.getElementById("pickup_state").value = item.pickup_state ?? "";
-    document.getElementById("delivery_city").value = item.delivery_city ?? "";
-    document.getElementById("delivery_state").value = item.delivery_state ?? "";
-    document.getElementById("miles").value = item.miles ?? "";
-    document.getElementById("broker_price").value = item.broker_price ?? "";
-    document.getElementById("driver_pay").value = item.driver_pay ?? "";
-    document.getElementById("loads_per_day").value = item.loads_per_day ?? "";
-    document.getElementById("dispatcher_commission_percent").value = item.dispatcher_commission_percent ?? "";
-    document.getElementById("payment_option").value = item.payment_option ?? "";
-    document.getElementById("comments").value = item.comments ?? "";
-    document.getElementById("edit_shipment_status").value = item.shipment_status ?? "created";
-    document.getElementById("edit_payment_status").value = item.payment_status ?? "unpaid";
-
-    const pickup = splitDateTime(item.pickup_datetime);
-    const pickupDateEl = document.getElementById("pickup_date");
-    pickupDateEl.value = pickup.date;
-    pickupDateEl.classList.remove("field-error");
-    setTimeInputValue("pickup_time", pickup.time);
-
-    const delivery = splitDateTime(item.delivery_datetime);
-    const deliveryDateEl = document.getElementById("delivery_date");
-    deliveryDateEl.value = delivery.date;
-    deliveryDateEl.classList.remove("field-error");
-    setTimeInputValue("delivery_time", delivery.time);
-
-    clearFormErrors();
-    calculateProfit();
-}
-
-function resetShipmentForm() {
-    if (shipmentForm) shipmentForm.reset();
-    document.getElementById("edit_shipment_id").value = "";
-    document.getElementById("edit_shipment_status").value = "created";
-    document.getElementById("edit_payment_status").value = "unpaid";
-    setTimeInputValue("pickup_time", "");
-    setTimeInputValue("delivery_time", "");
-
-    const createdDateEl = document.getElementById("shipment_created_date");
-    if (createdDateEl) {
-        createdDateEl.value = "";
-        createdDateEl.classList.remove("field-error");
-    }
-
-    clearFormErrors();
-    calculateProfit();
-}
-
-function openEditModal(item) {
-    resetShipmentForm();
-    fillShipmentForm(item);
-    shipmentModalTitle.textContent = "Edit Shipment";
-    shipmentSubmitBtn.textContent = "Save";
-    shipmentSubmitBtn.disabled = false;
-    editOnlyShipmentStatus.style.display = "";
-    editOnlyPaymentStatus.style.display = "";
-    openModal();
-}
-
 function positionFloatingMenu(anchorBtn) {
-    if (!floatingActionMenu || !anchorBtn) return;
-
+    if (!floatingActionMenu) return;
     const rect = anchorBtn.getBoundingClientRect();
+
     const menuWidth = 190;
-    const menuHeightEstimate = 220;
+    const menuHeightEstimate = 240;
 
-    let left = rect.left - menuWidth - 8;
-    let top = rect.top;
+    let left = rect.right - menuWidth;
+    let top = rect.bottom + 6;
 
-    if (left < 8) {
-        left = rect.right + 8;
-    }
-
+    if (left < 8) left = 8;
     if (left + menuWidth > window.innerWidth - 8) {
         left = window.innerWidth - menuWidth - 8;
     }
@@ -1452,7 +1033,7 @@ function openFloatingActionMenu(anchorBtn, item) {
     floatingActionMenu.innerHTML = "";
 
     appendFloatingMenuButton("Edit Shipment", async () => {
-        openEditModal(item);
+        await openEditModal(item);
     });
 
     appendFloatingMenuButton("View Logs", async () => {
@@ -1504,6 +1085,12 @@ function createActionsCell(item) {
 
     td.appendChild(btn);
     return td;
+}
+
+function getStatusClass(status) {
+    const key = (status || "").toLowerCase();
+    const modifier = STATUS_CLASS_MAP[key] || "status-created";
+    return `shipment-status ${modifier}`;
 }
 
 function createStatusCell(item) {
@@ -1664,7 +1251,12 @@ async function loadShipments() {
         }
 
         const data = await response.json();
-        allShipments = Array.isArray(data) ? data : [];
+        const rawShipments = Array.isArray(data) ? data : [];
+
+        allShipments = rawShipments.filter(item => {
+            const status = String(item?.shipment_status || "").toLowerCase();
+            return status !== "canceled" && status !== "cancelled" && status !== "deleted";
+        });
 
         allShipments.forEach(item => {
             if (item?.broker_name) {
@@ -1722,47 +1314,559 @@ function validateRequiredFields() {
         missing.push("delivery_date_format");
     }
 
-    const pickupTimeRaw = document.getElementById("pickup_time")?.value || "";
-    const deliveryTimeRaw = document.getElementById("delivery_time")?.value || "";
+    ["pickup_time", "delivery_time"].forEach(id => {
+        if (!handleManualTimeInput(id)) {
+            document.getElementById(id)?.classList.add("field-error");
+            missing.push(`${id}_format`);
+        }
+    });
 
-    const pickupTimeValid = normalizeTimeInputValue(pickupTimeRaw);
-    const deliveryTimeValid = normalizeTimeInputValue(deliveryTimeRaw);
-
-    if (pickupTimeRaw && !pickupTimeValid) {
-        document.getElementById("pickup_time")?.classList.add("field-error");
-        missing.push("pickup_time_format");
-    }
-
-    if (deliveryTimeRaw && !deliveryTimeValid) {
-        document.getElementById("delivery_time")?.classList.add("field-error");
-        missing.push("delivery_time_format");
-    }
-
-    if (missing.length) {
-        alert("Please fill in all required fields correctly before saving.");
-        return false;
-    }
-
-    return true;
+    return missing.length === 0;
 }
 
-async function handleCreateOrUpdateShipment(event) {
+function saveBrokerNameToHistory(name) {
+    const clean = String(name || "").trim();
+    if (!clean) return;
+
+    let list = [];
+    try {
+        list = JSON.parse(localStorage.getItem(BROKER_NAMES_KEY) || "[]");
+        if (!Array.isArray(list)) list = [];
+    } catch {
+        list = [];
+    }
+
+    const normalized = clean.toLowerCase();
+    list = list.filter(item => String(item).trim().toLowerCase() !== normalized);
+    list.unshift(clean);
+
+    if (list.length > 50) list = list.slice(0, 50);
+    localStorage.setItem(BROKER_NAMES_KEY, JSON.stringify(list));
+}
+
+function renderBrokerNameSuggestions() {
+    const datalist = document.getElementById("brokerNameSuggestions");
+    if (!datalist) return;
+
+    let list = [];
+    try {
+        list = JSON.parse(localStorage.getItem(BROKER_NAMES_KEY) || "[]");
+        if (!Array.isArray(list)) list = [];
+    } catch {
+        list = [];
+    }
+
+    datalist.innerHTML = "";
+    list.forEach(name => {
+        const option = document.createElement("option");
+        option.value = name;
+        datalist.appendChild(option);
+    });
+}
+
+function openCustomSelectModal({ title, subtitle, items, onSelect }) {
+    if (!customSelectModal || !customSelectList) return;
+
+    currentCustomSelectItems = Array.isArray(items) ? items : [];
+    currentCustomSelectHandler = onSelect || null;
+
+    customSelectTitle.textContent = title || "Select Option";
+    customSelectSubtitle.textContent = subtitle || "Choose one value";
+    customSelectSearch.value = "";
+
+    renderCustomSelectItems("");
+
+    customSelectModal.style.display = "flex";
+}
+
+function closeCustomSelectModal() {
+    if (!customSelectModal) return;
+    customSelectModal.style.display = "none";
+    currentCustomSelectItems = [];
+    currentCustomSelectHandler = null;
+    if (customSelectSearch) customSelectSearch.value = "";
+}
+
+function renderCustomSelectItems(searchText = "") {
+    if (!customSelectList) return;
+
+    const q = String(searchText || "").trim().toLowerCase();
+    customSelectList.innerHTML = "";
+
+    const filtered = currentCustomSelectItems.filter(item => {
+        if (!q) return true;
+        return String(item.search || "").toLowerCase().includes(q);
+    });
+
+    if (!filtered.length) {
+        customSelectList.innerHTML = `<div class="empty-logs">No results found.</div>`;
+        return;
+    }
+
+    filtered.forEach(item => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "small-btn";
+        btn.style.width = "100%";
+        btn.style.textAlign = "left";
+        btn.style.padding = "12px 14px";
+        btn.style.display = "block";
+        btn.style.marginBottom = "8px";
+
+        btn.innerHTML = `
+            <div style="font-weight:700; color:#e5eefb;">${escapeHtml(item.label || "")}</div>
+            ${item.meta ? `<div style="font-size:12px; color:#8ea0b8; margin-top:4px;">${escapeHtml(item.meta)}</div>` : ""}
+        `;
+
+        btn.addEventListener("click", () => {
+            if (typeof currentCustomSelectHandler === "function") {
+                currentCustomSelectHandler(item);
+            }
+            closeCustomSelectModal();
+        });
+
+        customSelectList.appendChild(btn);
+    });
+}
+
+function openShipmentStatusPicker() {
+    openCustomSelectModal({
+        title: "Select Shipment Status",
+        subtitle: "Choose shipment operational status",
+        items: SHIPMENT_STATUS_OPTIONS.map(item => ({
+            ...item,
+            search: `${item.label} ${item.value}`
+        })),
+        onSelect: (item) => {
+            const hidden = document.getElementById("edit_shipment_status");
+            const display = document.getElementById("edit_shipment_status_display");
+            if (hidden) hidden.value = item.value;
+            if (display) display.value = item.label;
+        }
+    });
+}
+
+function openDriverPaymentStatusPicker() {
+    openCustomSelectModal({
+        title: "Select Driver Payment Status",
+        subtitle: "Choose driver payment state",
+        items: DRIVER_PAYMENT_STATUS_OPTIONS.map(item => ({
+            ...item,
+            search: `${item.label} ${item.value}`
+        })),
+        onSelect: (item) => {
+            const hidden = document.getElementById("edit_payment_status");
+            const display = document.getElementById("edit_payment_status_display");
+            if (hidden) hidden.value = item.value;
+            if (display) display.value = item.label;
+        }
+    });
+}
+
+function openBrokerPaymentOptionPicker() {
+    openCustomSelectModal({
+        title: "Select Broker Payment Option",
+        subtitle: "Choose broker payment option",
+        items: BROKER_PAYMENT_OPTION_OPTIONS.map(item => ({
+            ...item,
+            search: `${item.label} ${item.value}`
+        })),
+        onSelect: (item) => {
+            const hidden = document.getElementById("payment_option");
+            const display = document.getElementById("payment_option_display");
+            if (hidden) hidden.value = item.value;
+            if (display) display.value = item.label;
+        }
+    });
+}
+
+function setShipmentStatusValue(value) {
+    const hidden = document.getElementById("edit_shipment_status");
+    const display = document.getElementById("edit_shipment_status_display");
+    const item = SHIPMENT_STATUS_OPTIONS.find(x => x.value === value) || SHIPMENT_STATUS_OPTIONS[0];
+    if (hidden) hidden.value = item.value;
+    if (display) display.value = item.label;
+}
+
+function setDriverPaymentStatusValue(value) {
+    const hidden = document.getElementById("edit_payment_status");
+    const display = document.getElementById("edit_payment_status_display");
+    const item = DRIVER_PAYMENT_STATUS_OPTIONS.find(x => x.value === value) || DRIVER_PAYMENT_STATUS_OPTIONS[0];
+    if (hidden) hidden.value = item.value;
+    if (display) display.value = item.label;
+}
+
+function setBrokerPaymentOptionValue(value) {
+    const hidden = document.getElementById("payment_option");
+    const display = document.getElementById("payment_option_display");
+    const item = BROKER_PAYMENT_OPTION_OPTIONS.find(x => x.value === value) || BROKER_PAYMENT_OPTION_OPTIONS[0];
+    if (hidden) hidden.value = item.value;
+    if (display) display.value = item.label;
+}
+
+function getStaffDisplayName(staff) {
+    if (!staff) return "";
+    return `${staff.staff_full_name} (${staff.job_title})`;
+}
+
+function setAssignedStaffValue(staffId) {
+    const hiddenInput = document.getElementById("assigned_staff_id");
+    const displayInput = document.getElementById("assigned_staff_id_display");
+
+    if (!hiddenInput || !displayInput) return;
+
+    const numericId = Number(staffId || 0);
+    hiddenInput.value = numericId ? String(numericId) : "";
+
+    const staff = managerStaffList.find(item => Number(item.staff_id) === numericId);
+
+    if (staff) {
+        displayInput.value = `${staff.staff_full_name} (${staff.job_title})`;
+        displayInput.dataset.staffId = String(staff.staff_id);
+        displayInput.dataset.staffName = staff.staff_full_name || "";
+    } else {
+        displayInput.value = "";
+        displayInput.dataset.staffId = "";
+        displayInput.dataset.staffName = "";
+    }
+}
+
+function openAssignedStaffPicker() {
+    if (!isManagerRole()) return;
+    if (!managerStaffList.length) return;
+
+    openCustomSelectModal({
+        title: "Select Shipment Owner",
+        subtitle: "Choose which staff member this shipment belongs to",
+        items: managerStaffList.map(staff => ({
+            value: String(staff.staff_id),
+            label: staff.staff_full_name || "",
+            meta: `ID: ${staff.staff_id} • ${staff.staff_username || ""} • ${staff.job_title || ""}`,
+            search: [
+                staff.staff_full_name || "",
+                staff.staff_username || "",
+                staff.job_title || "",
+                String(staff.staff_id || "")
+            ].join(" ")
+        })),
+        onSelect: (item) => {
+            setAssignedStaffValue(Number(item.value));
+        }
+    });
+}
+
+function populateAssignedStaffSelect(selectedId = null) {
+    if (!isManagerRole()) return;
+
+    const hiddenInput = document.getElementById("assigned_staff_id");
+    const displayInput = document.getElementById("assigned_staff_id_display");
+
+    if (!hiddenInput || !displayInput) return;
+
+    let finalId = Number(selectedId || 0);
+    if (!finalId) {
+        finalId = getCurrentUserId();
+    }
+
+    setAssignedStaffValue(finalId);
+}
+
+async function loadStaffListForManager() {
+    if (!isManagerRole()) return;
+
+    const response = await fetchWithAuth(`${API_BASE_URL}/users/all`, {
+        method: "GET"
+    });
+
+    if (!response || !response.ok) {
+        managerStaffList = [];
+        return;
+    }
+
+    const data = await response.json();
+    managerStaffList = Array.isArray(data) ? data : [];
+
+    populateAssignedStaffSelect(getCurrentUserId());
+
+    const displayInput = document.getElementById("assigned_staff_id_display");
+    if (displayInput) {
+        displayInput.removeEventListener("click", openAssignedStaffPicker);
+        displayInput.addEventListener("click", openAssignedStaffPicker);
+    }
+}
+
+function resetShipmentForm() {
+    shipmentForm?.reset();
+    clearFormErrors();
+
+    document.getElementById("edit_shipment_id").value = "";
+    setShipmentStatusValue("created");
+    setDriverPaymentStatusValue("unpaid");
+    setBrokerPaymentOptionValue("");
+
+    if (isManagerRole()) {
+        populateAssignedStaffSelect(getCurrentUserId());
+    }
+
+    setTimeInputValue("pickup_time", "");
+    setTimeInputValue("delivery_time", "");
+
+    if (calculatedProfitBox) {
+        calculatedProfitBox.textContent = "Profit: $0";
+    }
+}
+
+function openDeleteShipmentModal(id) {
+    pendingDeleteShipmentId = id;
+    if (confirmDeleteShipmentModal) {
+        confirmDeleteShipmentModal.style.display = "flex";
+    }
+}
+
+function closeDeleteShipmentModal() {
+    pendingDeleteShipmentId = null;
+    if (confirmDeleteShipmentModal) {
+        confirmDeleteShipmentModal.style.display = "none";
+    }
+}
+
+async function executeDeleteShipment() {
+    if (!pendingDeleteShipmentId) return;
+
+    try {
+        let response = await fetchWithAuth(`${API_BASE_URL}/shipments/delete/${pendingDeleteShipmentId}`, {
+            method: "DELETE"
+        });
+
+        if (!response || response.status === 404 || response.status === 405) {
+            response = await fetchWithAuth(`${API_BASE_URL}/shipments/delete`, {
+                method: "DELETE",
+                body: JSON.stringify({ shipment_id: pendingDeleteShipmentId })
+            });
+        }
+
+        closeDeleteShipmentModal();
+        await loadShipments();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function deleteShipment(shipmentId) {
+    openDeleteShipmentModal(shipmentId);
+}
+
+function openCreateModal() {
+    resetShipmentForm();
+    document.getElementById("edit_shipment_id").value = "";
+    shipmentModalTitle.textContent = "Create Shipment";
+    shipmentSubmitBtn.textContent = "Save";
+    shipmentSubmitBtn.disabled = false;
+    editOnlyShipmentStatus.style.display = "none";
+    editOnlyPaymentStatus.style.display = "none";
+
+    if (isManagerRole()) {
+        populateAssignedStaffSelect(getCurrentUserId());
+    }
+
+    openModal();
+}
+
+async function openEditModal(item) {
+    resetShipmentForm();
+
+    document.getElementById("edit_shipment_id").value = String(item.shipment_id || "");
+    shipmentModalTitle.textContent = `Edit Shipment #${item.shipment_id}`;
+    shipmentSubmitBtn.textContent = "Save";
+    shipmentSubmitBtn.disabled = false;
+
+    editOnlyShipmentStatus.style.display = "";
+    editOnlyPaymentStatus.style.display = "";
+
+    document.getElementById("shipment_created_date").value = formatDateToSlash(item.shipment_created_date);
+    document.getElementById("external_reference").value = item.external_reference || "";
+    document.getElementById("unit_number").value = item.unit_number || "";
+    document.getElementById("driver_name").value = item.driver_name || "";
+    document.getElementById("business_name").value = item.business_name || "";
+    document.getElementById("broker_name").value = item.broker_name || "";
+    document.getElementById("pickup_city").value = item.pickup_city || "";
+    document.getElementById("pickup_state").value = item.pickup_state || "";
+    document.getElementById("delivery_city").value = item.delivery_city || "";
+    document.getElementById("delivery_state").value = item.delivery_state || "";
+    document.getElementById("miles").value = item.miles ?? 0;
+    document.getElementById("broker_price").value = item.broker_price ?? 0;
+    document.getElementById("driver_pay").value = item.driver_pay ?? 0;
+    document.getElementById("loads_per_day").value = item.loads_per_day ?? 0;
+    document.getElementById("dispatcher_commission_percent").value = item.dispatcher_commission_percent ?? 0;
+    document.getElementById("comments").value = item.comments || "";
+
+    setShipmentStatusValue(item.shipment_status || "created");
+    setDriverPaymentStatusValue(item.payment_status || "unpaid");
+    setBrokerPaymentOptionValue(item.payment_option || "");
+
+    const pickupParts = splitDateTime(item.pickup_datetime);
+    const deliveryParts = splitDateTime(item.delivery_datetime);
+
+    document.getElementById("pickup_date").value = pickupParts.date || "";
+    document.getElementById("delivery_date").value = deliveryParts.date || "";
+    setTimeInputValue("pickup_time", pickupParts.time || "");
+    setTimeInputValue("delivery_time", deliveryParts.time || "");
+
+    if (isManagerRole()) {
+        populateAssignedStaffSelect(item.assigned_staff_id || getCurrentUserId());
+    }
+
+    calculateProfit();
+    openModal();
+}
+
+function openModal() {
+    if (shipmentModal) shipmentModal.style.display = "flex";
+}
+
+function closeModal() {
+    if (shipmentModal) shipmentModal.style.display = "none";
+}
+
+function openLogsModal() {
+    if (shipmentLogsModal) shipmentLogsModal.style.display = "flex";
+}
+
+function closeLogsModal() {
+    if (shipmentLogsModal) shipmentLogsModal.style.display = "none";
+}
+
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.openCreateModal = openCreateModal;
+window.closeLogsModal = closeLogsModal;
+
+function calculateProfit() {
+    if (!brokerPriceInput || !driverPayInput || !calculatedProfitBox) return;
+
+    const broker = Number(brokerPriceInput.value) || 0;
+    const driver = Number(driverPayInput.value) || 0;
+    const profit = broker - driver;
+
+    calculatedProfitBox.textContent = `Profit: $${profit.toLocaleString()}`;
+}
+
+async function updateShipmentStatus(shipmentId, newStatus) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/shipments/update`, {
+            method: "PUT",
+            body: JSON.stringify({
+                shipment_id: shipmentId,
+                shipment_status: newStatus
+            })
+        });
+
+        if (!response) return;
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch {}
+
+        if (!response.ok) {
+            alert(result.detail || "Failed to update shipment status.");
+            return;
+        }
+
+        await loadShipments();
+    } catch (err) {
+        console.error("Status update error:", err);
+        alert("Server error while updating shipment status.");
+    }
+}
+
+async function fetchShipmentLogs(shipmentId) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/shipments/logs/${shipmentId}`, {
+        method: "GET"
+    });
+
+    if (!response || !response.ok) return null;
+
+    try {
+        return await response.json();
+    } catch {
+        return [];
+    }
+}
+
+function renderLogs(logs, shipmentId) {
+    shipmentLogsTitle.textContent = `Shipment Logs #${shipmentId}`;
+    shipmentLogsContainer.innerHTML = "";
+
+    if (!Array.isArray(logs) || logs.length === 0) {
+        shipmentLogsContainer.innerHTML = `<div class="empty-logs">No logs found for this shipment.</div>`;
+        return;
+    }
+
+    logs.forEach(log => {
+        const card = document.createElement("div");
+        card.className = "log-card";
+
+        const userName =
+            log.changed_by_name ||
+            log.staff_full_name ||
+            log.username ||
+            "Unknown User";
+
+        const changedAt = formatDateTime(log.created_at || log.updated_at);
+        const fieldName = log.field_name || "Change";
+
+        const oldValue =
+            log.old_value === null || log.old_value === undefined || log.old_value === ""
+                ? "—"
+                : String(log.old_value);
+
+        const newValue =
+            log.new_value === null || log.new_value === undefined || log.new_value === ""
+                ? "—"
+                : String(log.new_value);
+
+        card.innerHTML = `
+            <div class="log-card-top">
+                <div class="log-user">${escapeHtml(userName)}</div>
+                <div class="log-date">${escapeHtml(changedAt)}</div>
+            </div>
+            <div class="log-field">${escapeHtml(fieldName)}</div>
+            <div class="log-values">
+                <div class="log-value-box"><strong>Old:</strong> ${escapeHtml(oldValue)}</div>
+                <div class="log-value-box"><strong>New:</strong> ${escapeHtml(newValue)}</div>
+            </div>
+        `;
+
+        shipmentLogsContainer.appendChild(card);
+    });
+}
+
+async function openShipmentLogs(item) {
+    openLogsModal();
+    shipmentLogsTitle.textContent = `Shipment Logs #${item.shipment_id}`;
+    shipmentLogsContainer.innerHTML = `<div class="empty-logs">Loading logs...</div>`;
+
+    const logs = await fetchShipmentLogs(item.shipment_id);
+    renderLogs(logs || [], item.shipment_id);
+}
+
+async function saveShipment(event) {
     event.preventDefault();
 
     if (isCreating) return;
+    if (!validateRequiredFields()) {
+        alert("Please fill all required fields correctly.");
+        return;
+    }
 
-    if (pickupTimeInput?.value.trim()) handleManualTimeInput("pickup_time");
-    if (deliveryTimeInput?.value.trim()) handleManualTimeInput("delivery_time");
-
-    if (!validateRequiredFields()) return;
-
-    const editShipmentId = getInputValue("edit_shipment_id");
+    const editShipmentId = document.getElementById("edit_shipment_id").value;
 
     const payload = {
         company_id: 1,
         shipment_created_date: buildCreatedDateTime("shipment_created_date"),
-        unit_number: getInputValue("unit_number"),
         external_reference: getInputValue("external_reference"),
+        unit_number: getInputValue("unit_number"),
         driver_name: getInputValue("driver_name"),
         business_name: getInputValue("business_name"),
         broker_name: getInputValue("broker_name"),
@@ -1780,6 +1884,13 @@ async function handleCreateOrUpdateShipment(event) {
         payment_option: getInputValue("payment_option"),
         comments: getInputValue("comments")
     };
+
+    if (isManagerRole()) {
+        const assignedStaffId = document.getElementById("assigned_staff_id")?.value || "";
+        if (assignedStaffId) {
+            payload.assigned_staff_id = Number(assignedStaffId);
+        }
+    }
 
     if (!payload.shipment_created_date || !payload.pickup_datetime || !payload.delivery_datetime) {
         alert("Created, pickup, and delivery date/time are required.");
@@ -1853,7 +1964,6 @@ async function handleCreateOrUpdateShipment(event) {
 function setDefaultMonthFilter() {
     const now = new Date();
     filterMonth.value = formatMonthValue(now.getFullYear(), now.getMonth());
-    monthPickerViewYear = now.getFullYear();
 }
 
 function bindFilterEvents() {
@@ -1864,250 +1974,77 @@ function bindFilterEvents() {
     });
 
     if (filterCreatedDate) {
-        normalizeDateTyping(filterCreatedDate, () => {
-            refreshFilteredView();
-        });
-
+        normalizeDateTyping(filterCreatedDate, refreshFilteredView);
         filterCreatedDate.addEventListener("change", refreshFilteredView);
-        filterCreatedDate.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
+    }
+
+    if (filterMonth) {
+        filterMonth.addEventListener("change", refreshFilteredView);
+    }
+}
+
+function bindDateAndTimeInputs() {
+    [
+        document.getElementById("shipment_created_date"),
+        document.getElementById("pickup_date"),
+        document.getElementById("delivery_date")
+    ].forEach(el => normalizeDateTyping(el));
+
+    ["pickup_time", "delivery_time"].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.addEventListener("blur", () => {
+            handleManualTimeInput(id);
+        });
+
+        el.addEventListener("dblclick", () => {
+            const current = getTimeInputValue(id) || "08:00";
+            const typed = prompt("Enter time in HH:MM or H:MM AM/PM", formatTimeForDisplay(current));
+            if (typed !== null) {
+                const normalized = normalizeTimeInputValue(typed);
+                if (normalized) {
+                    setTimeInputValue(id, normalized);
+                } else {
+                    el.classList.add("field-error");
+                }
+            }
+        });
+    });
+
+    [
+        ["shipmentCreatedDatePickerBtn", "shipment_created_date"],
+        ["pickupDatePickerBtn", "pickup_date"],
+        ["deliveryDatePickerBtn", "delivery_date"],
+        ["filterCreatedDatePickerBtn", "filterCreatedDate"]
+    ].forEach(([btnId, inputId]) => {
+        const btn = document.getElementById(btnId);
+        const input = document.getElementById(inputId);
+        if (!btn || !input) return;
+
+        btn.addEventListener("click", () => {
+            input.focus();
+        });
+    });
+
+    if (filterMonthPickerBtn && filterMonth) {
+        filterMonthPickerBtn.addEventListener("click", () => {
+            const typed = prompt("Enter month as Mon YYYY", filterMonth.value || formatMonthValue(new Date().getFullYear(), new Date().getMonth()));
+            if (typed !== null) {
+                filterMonth.value = typed;
                 refreshFilteredView();
             }
         });
     }
 }
 
-function openDatePickerFor(inputId, titleText) {
-    datePickerTargetInputId = inputId;
-    if (dateModalTitle) dateModalTitle.textContent = titleText || "Select Date";
-
-    const input = document.getElementById(inputId);
-    const parsed = parseSlashDate(input?.value);
-    datePickerViewDate = parsed || new Date();
-
-    renderDatePickerGrid();
-    if (datePickerModal) datePickerModal.style.display = "flex";
-}
-
-function closeDatePickerModal() {
-    if (datePickerModal) datePickerModal.style.display = "none";
-    datePickerTargetInputId = null;
-}
-
-function renderDatePickerGrid() {
-    if (!dateGrid || !dateCurrentMonthLabel) return;
-
-    const year = datePickerViewDate.getFullYear();
-    const month = datePickerViewDate.getMonth();
-
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-
-    dateCurrentMonthLabel.textContent = datePickerViewDate.toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric"
-    });
-
-    dateGrid.innerHTML = "";
-
-    const mondayBasedFirstDay = (firstDay.getDay() + 6) % 7;
-    const daysInMonth = lastDay.getDate();
-    const prevMonthLastDay = new Date(year, month, 0).getDate();
-
-    for (let i = 0; i < mondayBasedFirstDay; i++) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "date-day-btn muted";
-        btn.textContent = String(prevMonthLastDay - mondayBasedFirstDay + i + 1);
-        btn.tabIndex = -1;
-        dateGrid.appendChild(btn);
+document.addEventListener("click", (e) => {
+    if (floatingActionMenuOpen && floatingActionMenu && !floatingActionMenu.contains(e.target)) {
+        closeFloatingActionMenu();
     }
+});
 
-    const targetInput = datePickerTargetInputId ? document.getElementById(datePickerTargetInputId) : null;
-    const selectedDate = parseSlashDate(targetInput?.value);
-
-    for (let day = 1; day <= daysInMonth; day++) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "date-day-btn";
-        btn.textContent = String(day);
-
-        const currentDate = new Date(year, month, day);
-
-        if (
-            selectedDate &&
-            selectedDate.getFullYear() === currentDate.getFullYear() &&
-            selectedDate.getMonth() === currentDate.getMonth() &&
-            selectedDate.getDate() === currentDate.getDate()
-        ) {
-            btn.classList.add("active");
-        }
-
-        btn.addEventListener("click", () => {
-            if (!datePickerTargetInputId) return;
-            const input = document.getElementById(datePickerTargetInputId);
-            if (!input) return;
-
-            input.value = formatDateToSlash(currentDate);
-            input.classList.remove("field-error");
-
-            if (datePickerTargetInputId === "filterCreatedDate") {
-                refreshFilteredView();
-            }
-
-            closeDatePickerModal();
-        });
-
-        dateGrid.appendChild(btn);
-    }
-
-    const totalCells = mondayBasedFirstDay + daysInMonth;
-    const trailingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
-
-    for (let i = 1; i <= trailingCells; i++) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "date-day-btn muted";
-        btn.textContent = String(i);
-        btn.tabIndex = -1;
-        dateGrid.appendChild(btn);
-    }
-}
-
-function openMonthPicker() {
-    const parsed = parseMonthDisplay(filterMonth?.value || "");
-    monthPickerViewYear = parsed?.year || new Date().getFullYear();
-    renderMonthPickerGrid();
-    if (monthPickerModal) monthPickerModal.style.display = "flex";
-}
-
-function closeMonthPicker() {
-    if (monthPickerModal) monthPickerModal.style.display = "none";
-}
-
-function renderMonthPickerGrid() {
-    if (!monthGrid || !monthCurrentYearLabel) return;
-
-    monthCurrentYearLabel.textContent = String(monthPickerViewYear);
-    monthGrid.innerHTML = "";
-
-    const selected = parseMonthDisplay(filterMonth?.value || "");
-
-    MONTH_NAMES_SHORT.forEach((name, index) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "month-btn";
-        btn.textContent = name;
-
-        if (selected && selected.year === monthPickerViewYear && selected.monthIndex === index) {
-            btn.classList.add("active");
-        }
-
-        btn.addEventListener("click", () => {
-            filterMonth.value = formatMonthValue(monthPickerViewYear, index);
-            closeMonthPicker();
-            refreshFilteredView();
-        });
-
-        monthGrid.appendChild(btn);
-    });
-}
-
-function openTimePickerFor(inputId, titleText) {
-    timePickerTargetInputId = inputId;
-    if (timeModalTitle) timeModalTitle.textContent = titleText || "Select Time";
-
-    const current = getTimeInputValue(inputId);
-
-    if (current) {
-        const [hh, mm] = current.split(":").map(Number);
-        const ampm = hh >= 12 ? "PM" : "AM";
-        let hour12 = hh % 12;
-        if (hour12 === 0) hour12 = 12;
-
-        timePickerState = {
-            hour: hour12,
-            minute: mm,
-            ampm
-        };
-    } else {
-        timePickerState = { hour: 12, minute: 0, ampm: "AM" };
-    }
-
-    renderTimePicker();
-
-    if (timePickerModal) {
-        timePickerModal.style.display = "flex";
-    }
-}
-
-function closeTimePicker() {
-    if (timePickerModal) timePickerModal.style.display = "none";
-    timePickerTargetInputId = null;
-}
-
-function renderTimePicker() {
-    if (!timeHourDisplay || !timeMinuteDisplay || !timePreviewBox) return;
-
-    timeHourDisplay.textContent = String(timePickerState.hour).padStart(2, "0");
-    timeMinuteDisplay.textContent = String(timePickerState.minute).padStart(2, "0");
-
-    if (timeAmBtn) timeAmBtn.classList.toggle("active", timePickerState.ampm === "AM");
-    if (timePmBtn) timePmBtn.classList.toggle("active", timePickerState.ampm === "PM");
-
-    let hour24 = timePickerState.hour % 12;
-    if (timePickerState.ampm === "PM") hour24 += 12;
-
-    const hhmm = `${String(hour24).padStart(2, "0")}:${String(timePickerState.minute).padStart(2, "0")}`;
-    timePreviewBox.textContent = formatTimeForDisplay(hhmm);
-}
-
-function adjustTimeHour(step) {
-    let next = timePickerState.hour + step;
-    if (next > 12) next = 1;
-    if (next < 1) next = 12;
-    timePickerState.hour = next;
-    renderTimePicker();
-}
-
-function adjustTimeMinute(step) {
-    let next = timePickerState.minute + step;
-
-    while (next >= 60) next -= 60;
-    while (next < 0) next += 60;
-
-    timePickerState.minute = next;
-    renderTimePicker();
-}
-
-function applyTimePickerValue() {
-    if (!timePickerTargetInputId) return;
-
-    let hour24 = timePickerState.hour % 12;
-    if (timePickerState.ampm === "PM") hour24 += 12;
-
-    const hhmm = `${String(hour24).padStart(2, "0")}:${String(timePickerState.minute).padStart(2, "0")}`;
-    setTimeInputValue(timePickerTargetInputId, hhmm);
-
-    const input = document.getElementById(timePickerTargetInputId);
-    input?.classList.remove("field-error");
-
-    closeTimePicker();
-}
-
-function openTimeFormatModal() {
-    if (timeFormatModal) {
-        syncTimeFormatUI();
-        timeFormatModal.style.display = "flex";
-    }
-}
-
-function closeTimeFormatModal() {
-    if (timeFormatModal) timeFormatModal.style.display = "none";
-}
-
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     shipmentsTable = document.getElementById("shipmentsTable");
     shipmentsHeaderRow = document.getElementById("shipmentsHeaderRow");
     logoutBtn = document.getElementById("logoutBtn");
@@ -2145,325 +2082,94 @@ document.addEventListener("DOMContentLoaded", () => {
     shipmentCreatedDatePickerBtn = document.getElementById("shipmentCreatedDatePickerBtn");
     editOnlyShipmentStatus = document.getElementById("editOnlyShipmentStatus");
     editOnlyPaymentStatus = document.getElementById("editOnlyPaymentStatus");
-    floatingActionMenu = document.getElementById("floatingActionMenu");
     pickupTimeInput = document.getElementById("pickup_time");
     deliveryTimeInput = document.getElementById("delivery_time");
-
+    floatingActionMenu = document.getElementById("floatingActionMenu");
     confirmDeleteShipmentModal = document.getElementById("confirmDeleteShipmentModal");
     cancelDeleteShipmentBtn = document.getElementById("cancelDeleteShipmentBtn");
     confirmDeleteShipmentBtn = document.getElementById("confirmDeleteShipmentBtn");
 
-    datePickerModal = document.getElementById("datePickerModal");
-    datePrevMonthBtn = document.getElementById("datePrevMonthBtn");
-    dateNextMonthBtn = document.getElementById("dateNextMonthBtn");
-    dateGrid = document.getElementById("dateGrid");
-    dateCurrentMonthLabel = document.getElementById("dateCurrentMonthLabel");
-    dateCloseBtn = document.getElementById("dateCloseBtn");
-    dateClearBtn = document.getElementById("dateClearBtn");
-    dateModalTitle = document.getElementById("dateModalTitle");
+    customSelectModal = document.getElementById("customSelectModal");
+    customSelectTitle = document.getElementById("customSelectTitle");
+    customSelectSubtitle = document.getElementById("customSelectSubtitle");
+    customSelectSearch = document.getElementById("customSelectSearch");
+    customSelectList = document.getElementById("customSelectList");
+    customSelectCloseBtn = document.getElementById("customSelectCloseBtn");
 
-    monthPickerModal = document.getElementById("monthPickerModal");
-    monthPrevYearBtn = document.getElementById("monthPrevYearBtn");
-    monthNextYearBtn = document.getElementById("monthNextYearBtn");
-    monthGrid = document.getElementById("monthGrid");
-    monthCurrentYearLabel = document.getElementById("monthCurrentYearLabel");
-    monthCloseBtn = document.getElementById("monthCloseBtn");
-    monthClearBtn = document.getElementById("monthClearBtn");
+    applySidebarRoleVisibility();
+    syncTimeFormatUI();
+    renderHeader();
+    renderColumnManager();
+    setupDropZone(visibleColumnsZone, "visible");
+    setupDropZone(hiddenColumnsZone, "hidden");
+    setDefaultMonthFilter();
+    bindFilterEvents();
+    bindDateAndTimeInputs();
+    renderBrokerNameSuggestions();
 
-    timePickerModal = document.getElementById("timePickerModal");
-    timeModalTitle = document.getElementById("timeModalTitle");
-    timeHourUpBtn = document.getElementById("timeHourUpBtn");
-    timeHourDownBtn = document.getElementById("timeHourDownBtn");
-    timeMinuteUpBtn = document.getElementById("timeMinuteUpBtn");
-    timeMinuteDownBtn = document.getElementById("timeMinuteDownBtn");
-    timeHourDisplay = document.getElementById("timeHourDisplay");
-    timeMinuteDisplay = document.getElementById("timeMinuteDisplay");
-    timeAmBtn = document.getElementById("timeAmBtn");
-    timePmBtn = document.getElementById("timePmBtn");
-    timePreviewBox = document.getElementById("timePreviewBox");
-    timeClearBtn = document.getElementById("timeClearBtn");
-    timeCloseBtn = document.getElementById("timeCloseBtn");
-    timeApplyBtn = document.getElementById("timeApplyBtn");
+    try {
+        if (isManagerRole()) {
+            await loadStaffListForManager();
+        }
+    } catch (e) {
+        console.error("Manager block error:", e);
+    }
 
-    timeFormatModal = document.getElementById("timeFormatModal");
-    formatCloseBtn = document.getElementById("formatCloseBtn");
-    formatOptionButtons = Array.from(document.querySelectorAll(".format-option-btn"));
+    setShipmentStatusValue("created");
+    setDriverPaymentStatusValue("unpaid");
+    setBrokerPaymentOptionValue("");
+
+    logoutBtn?.addEventListener("click", logout);
+    toggleSidebarBtn?.addEventListener("click", toggleSidebar);
+
+    toggleColumnsBtn?.addEventListener("click", () => {
+        columnToolbar?.classList.toggle("open");
+    });
+
+    toggleFiltersBtn?.addEventListener("click", () => {
+        filtersPanel?.classList.toggle("open");
+    });
+
+    resetColumnsBtn?.addEventListener("click", resetColumns);
+
+    brokerPriceInput?.addEventListener("input", calculateProfit);
+    driverPayInput?.addEventListener("input", calculateProfit);
+
+    shipmentForm?.addEventListener("submit", saveShipment);
+
+    shipmentModal?.addEventListener("click", (e) => {
+        if (e.target === shipmentModal) closeModal();
+    });
+
+    shipmentLogsModal?.addEventListener("click", (e) => {
+        if (e.target === shipmentLogsModal) closeLogsModal();
+    });
+
+    cancelDeleteShipmentBtn?.addEventListener("click", closeDeleteShipmentModal);
+    confirmDeleteShipmentBtn?.addEventListener("click", executeDeleteShipment);
+
+    timeFormatDisplay?.addEventListener("click", () => {
+        const current = getTimeFormat();
+        const next = current === "12" ? "24" : "12";
+        setTimeFormat(next);
+        refreshTimeDisplaysForFormatChange();
+    });
+
+    document.getElementById("assigned_staff_id_display")?.addEventListener("click", openAssignedStaffPicker);
+    document.getElementById("edit_payment_status_display")?.addEventListener("click", openDriverPaymentStatusPicker);
+    document.getElementById("payment_option_display")?.addEventListener("click", openBrokerPaymentOptionPicker);
+    document.getElementById("edit_shipment_status_display")?.addEventListener("click", openShipmentStatusPicker);
+
+    customSelectCloseBtn?.addEventListener("click", closeCustomSelectModal);
+    customSelectModal?.addEventListener("click", (e) => {
+        if (e.target === customSelectModal) closeCustomSelectModal();
+    });
+    customSelectSearch?.addEventListener("input", () => {
+        renderCustomSelectItems(customSelectSearch.value);
+    });
 
     populateStateSelect("pickup_state");
     populateStateSelect("delivery_state");
-    renderBrokerNameSuggestions();
-    renderColumnManager();
-    renderHeader();
-    setDefaultMonthFilter();
-    bindFilterEvents();
-    syncTimeFormatUI();
 
-    normalizeDateTyping(document.getElementById("shipment_created_date"));
-    normalizeDateTyping(document.getElementById("pickup_date"));
-    normalizeDateTyping(document.getElementById("delivery_date"));
-
-    calculateProfit();
-    setTimeInputValue("pickup_time", "");
-    setTimeInputValue("delivery_time", "");
-
-    loadShipments();
-
-    setupZoneDrop(visibleColumnsZone, "visible");
-    setupZoneDrop(hiddenColumnsZone, "hidden");
-
-    if (logoutBtn) logoutBtn.addEventListener("click", logout);
-    if (brokerPriceInput) brokerPriceInput.addEventListener("input", calculateProfit);
-    if (driverPayInput) driverPayInput.addEventListener("input", calculateProfit);
-    if (shipmentForm) shipmentForm.addEventListener("submit", handleCreateOrUpdateShipment);
-    if (resetColumnsBtn) resetColumnsBtn.addEventListener("click", resetColumns);
-    if (toggleColumnsBtn) toggleColumnsBtn.addEventListener("click", toggleColumnToolbar);
-    if (toggleFiltersBtn) toggleFiltersBtn.addEventListener("click", toggleFiltersPanel);
-    if (toggleSidebarBtn) toggleSidebarBtn.addEventListener("click", toggleSidebar);
-
-    REQUIRED_FIELD_IDS.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener("input", () => el.classList.remove("field-error"));
-        el.addEventListener("change", () => el.classList.remove("field-error"));
-    });
-
-    if (timeFormatDisplay) {
-        timeFormatDisplay.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openTimeFormatModal();
-        });
-    }
-
-    formatOptionButtons.forEach(btn => {
-        btn.addEventListener("click", () => {
-            setTimeFormat(btn.dataset.formatValue);
-            refreshTimeDisplaysForFormatChange();
-            renderShipmentsTable(filteredShipments);
-            closeTimeFormatModal();
-        });
-    });
-
-    if (filterCreatedDatePickerBtn) {
-        filterCreatedDatePickerBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openDatePickerFor("filterCreatedDate", "Select Created Date");
-        });
-    }
-
-    if (filterMonthPickerBtn) {
-        filterMonthPickerBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openMonthPicker();
-        });
-    }
-
-    if (shipmentCreatedDatePickerBtn) {
-        shipmentCreatedDatePickerBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openDatePickerFor("shipment_created_date", "Select Created Date");
-        });
-    }
-
-    if (pickupDatePickerBtn) {
-        pickupDatePickerBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openDatePickerFor("pickup_date", "Select Pickup Date");
-        });
-    }
-
-    if (deliveryDatePickerBtn) {
-        deliveryDatePickerBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openDatePickerFor("delivery_date", "Select Delivery Date");
-        });
-    }
-
-    if (pickupTimeInput) {
-        pickupTimeInput.addEventListener("dblclick", (e) => {
-            e.stopPropagation();
-            openTimePickerFor("pickup_time", "Select Pickup Time");
-        });
-
-        pickupTimeInput.addEventListener("blur", () => {
-            if (pickupTimeInput.value.trim()) {
-                handleManualTimeInput("pickup_time");
-            }
-        });
-
-        pickupTimeInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                handleManualTimeInput("pickup_time");
-            }
-        });
-    }
-
-    if (deliveryTimeInput) {
-        deliveryTimeInput.addEventListener("dblclick", (e) => {
-            e.stopPropagation();
-            openTimePickerFor("delivery_time", "Select Delivery Time");
-        });
-
-        deliveryTimeInput.addEventListener("blur", () => {
-            if (deliveryTimeInput.value.trim()) {
-                handleManualTimeInput("delivery_time");
-            }
-        });
-
-        deliveryTimeInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                handleManualTimeInput("delivery_time");
-            }
-        });
-    }
-
-    if (timeHourUpBtn) timeHourUpBtn.addEventListener("click", () => adjustTimeHour(1));
-    if (timeHourDownBtn) timeHourDownBtn.addEventListener("click", () => adjustTimeHour(-1));
-    if (timeMinuteUpBtn) timeMinuteUpBtn.addEventListener("click", () => adjustTimeMinute(5));
-    if (timeMinuteDownBtn) timeMinuteDownBtn.addEventListener("click", () => adjustTimeMinute(-5));
-
-    if (timeAmBtn) {
-        timeAmBtn.addEventListener("click", () => {
-            timePickerState.ampm = "AM";
-            renderTimePicker();
-        });
-    }
-
-    if (timePmBtn) {
-        timePmBtn.addEventListener("click", () => {
-            timePickerState.ampm = "PM";
-            renderTimePicker();
-        });
-    }
-
-    if (timeApplyBtn) timeApplyBtn.addEventListener("click", applyTimePickerValue);
-    if (timeCloseBtn) timeCloseBtn.addEventListener("click", closeTimePicker);
-
-    if (timeClearBtn) {
-        timeClearBtn.addEventListener("click", () => {
-            if (timePickerTargetInputId) {
-                setTimeInputValue(timePickerTargetInputId, "");
-                const input = document.getElementById(timePickerTargetInputId);
-                input?.classList.remove("field-error");
-            }
-            closeTimePicker();
-        });
-    }
-
-    if (datePrevMonthBtn) {
-        datePrevMonthBtn.addEventListener("click", () => {
-            datePickerViewDate = new Date(datePickerViewDate.getFullYear(), datePickerViewDate.getMonth() - 1, 1);
-            renderDatePickerGrid();
-        });
-    }
-
-    if (dateNextMonthBtn) {
-        dateNextMonthBtn.addEventListener("click", () => {
-            datePickerViewDate = new Date(datePickerViewDate.getFullYear(), datePickerViewDate.getMonth() + 1, 1);
-            renderDatePickerGrid();
-        });
-    }
-
-    if (dateCloseBtn) dateCloseBtn.addEventListener("click", closeDatePickerModal);
-
-    if (dateClearBtn) {
-        dateClearBtn.addEventListener("click", () => {
-            if (datePickerTargetInputId) {
-                const input = document.getElementById(datePickerTargetInputId);
-                if (input) {
-                    input.value = "";
-                    input.classList.remove("field-error");
-                }
-                if (datePickerTargetInputId === "filterCreatedDate") {
-                    refreshFilteredView();
-                }
-            }
-            closeDatePickerModal();
-        });
-    }
-
-    if (monthPrevYearBtn) {
-        monthPrevYearBtn.addEventListener("click", () => {
-            monthPickerViewYear -= 1;
-            renderMonthPickerGrid();
-        });
-    }
-
-    if (monthNextYearBtn) {
-        monthNextYearBtn.addEventListener("click", () => {
-            monthPickerViewYear += 1;
-            renderMonthPickerGrid();
-        });
-    }
-
-    if (monthCloseBtn) monthCloseBtn.addEventListener("click", closeMonthPicker);
-
-    if (monthClearBtn) {
-        monthClearBtn.addEventListener("click", () => {
-            if (filterMonth) filterMonth.value = "";
-            closeMonthPicker();
-            refreshFilteredView();
-        });
-    }
-
-    if (formatCloseBtn) formatCloseBtn.addEventListener("click", closeTimeFormatModal);
-
-    if (cancelDeleteShipmentBtn) {
-        cancelDeleteShipmentBtn.addEventListener("click", closeDeleteShipmentModal);
-    }
-
-    if (confirmDeleteShipmentBtn) {
-        confirmDeleteShipmentBtn.addEventListener("click", executeDeleteShipment);
-    }
-
-    if (confirmDeleteShipmentModal) {
-        confirmDeleteShipmentModal.addEventListener("click", (e) => {
-            if (e.target === confirmDeleteShipmentModal) {
-                closeDeleteShipmentModal();
-            }
-        });
-    }
-
-    if (shipmentModal) {
-        shipmentModal.addEventListener("click", (e) => {
-            if (e.target === shipmentModal) closeModal();
-        });
-    }
-
-    if (shipmentLogsModal) {
-        shipmentLogsModal.addEventListener("click", (e) => {
-            if (e.target === shipmentLogsModal) closeLogsModal();
-        });
-    }
-
-    if (datePickerModal) {
-        datePickerModal.addEventListener("click", (e) => {
-            if (e.target === datePickerModal) closeDatePickerModal();
-        });
-    }
-
-    if (monthPickerModal) {
-        monthPickerModal.addEventListener("click", (e) => {
-            if (e.target === monthPickerModal) closeMonthPicker();
-        });
-    }
-
-    if (timePickerModal) {
-        timePickerModal.addEventListener("click", (e) => {
-            if (e.target === timePickerModal) closeTimePicker();
-        });
-    }
-
-    if (timeFormatModal) {
-        timeFormatModal.addEventListener("click", (e) => {
-            if (e.target === timeFormatModal) closeTimeFormatModal();
-        });
-    }
-
-    document.addEventListener("click", (e) => {
-        if (floatingActionMenuOpen && floatingActionMenu && !floatingActionMenu.contains(e.target)) {
-            closeFloatingActionMenu();
-        }
-    });
+    await loadShipments();
 });

@@ -30,6 +30,24 @@ function getUserData() {
     }
 }
 
+function getCurrentUserRole() {
+    const user = getUserData();
+    return String(user?.job_title || "").trim().toLowerCase();
+}
+
+function setSidebarLinkVisibility(href, allowedRoles) {
+    const role = getCurrentUserRole();
+
+    document.querySelectorAll(`a.nav-link[href="${href}"]`).forEach((el) => {
+        el.style.display = allowedRoles.includes(role) ? "" : "none";
+    });
+}
+
+function applySidebarRoleVisibility() {
+    setSidebarLinkVisibility("/users", ["manager"]);
+    setSidebarLinkVisibility("/archive", ["manager", "supervisor", "hr", "accounting"]);
+}
+
 function clearAuthAndRedirect() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -441,6 +459,7 @@ function assignElements() {
 
 function init() {
     assignElements();
+    applySidebarRoleVisibility();
     bindEvents();
 
     const params = getQueryParams();

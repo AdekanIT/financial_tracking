@@ -364,6 +364,7 @@
         .custom-trigger-input {
             width: 100%;
             padding-right: 42px !important;
+            cursor: pointer;
         }
 
         .custom-trigger-icon {
@@ -650,8 +651,7 @@
             border: 1px solid rgba(34, 197, 94, 0.22);
         }
 
-        .status-canceled,
-        .status-cancelled {
+        .status-canceled {
             background: rgba(239, 68, 68, 0.14);
             color: #fca5a5;
             border: 1px solid rgba(239, 68, 68, 0.22);
@@ -1246,7 +1246,7 @@
                         <label for="filterCreatedDate">Created Date</label>
                         <div class="input-with-picker">
                             <input id="filterCreatedDate" class="compact-input" type="text" placeholder="mm/dd/yyyy" autocomplete="off">
-                            <button id="filterCreatedDatePickerBtn" class="picker-launch-btn" type="button" title="Pick date" aria-label="Pick created date">
+                            <button id="filterCreatedDatePickerBtn" class="picker-launch-btn" type="button" title="Pick created date" aria-label="Pick created date">
                                 <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
                             </button>
                         </div>
@@ -1330,6 +1330,17 @@
                         <button id="shipmentCreatedDatePickerBtn" class="picker-launch-btn" type="button" title="Pick created date">
                             <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
                         </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="assigned_staff_id_display">Shipment Owner</label>
+                    <div class="custom-trigger">
+                        <input type="text" id="assigned_staff_id_display" class="custom-trigger-input" placeholder="Select shipment owner" readonly>
+                        <input type="hidden" id="assigned_staff_id" value="">
+                        <span class="custom-trigger-icon" aria-hidden="true">
+                            <svg class="icon-svg"><use href="#icon-chevron-down"></use></svg>
+                        </span>
                     </div>
                 </div>
 
@@ -1459,32 +1470,36 @@
                 </div>
 
                 <div id="editOnlyShipmentStatus" class="form-group" style="display:none;">
-                    <label for="edit_shipment_status">Shipment Status</label>
-                    <select id="edit_shipment_status">
-                        <option value="created">Created</option>
-                        <option value="picked_up">Picked Up</option>
-                        <option value="in_transit">In Transit</option>
-                        <option value="delivered">Delivered</option>
-                        <option value="tonu">TONU</option>
-                        <option value="canceled">Canceled</option>
-                    </select>
+                    <label for="edit_shipment_status_display">Shipment Status</label>
+                    <div class="custom-trigger">
+                        <input type="text" id="edit_shipment_status_display" class="custom-trigger-input" placeholder="Select shipment status" readonly>
+                        <input type="hidden" id="edit_shipment_status" value="created">
+                        <span class="custom-trigger-icon" aria-hidden="true">
+                            <svg class="icon-svg"><use href="#icon-chevron-down"></use></svg>
+                        </span>
+                    </div>
                 </div>
 
                 <div id="editOnlyPaymentStatus" class="form-group" style="display:none;">
-                    <label for="edit_payment_status">Driver Payment Status</label>
-                    <select id="edit_payment_status">
-                        <option value="unpaid">Unpaid</option>
-                        <option value="paid">Paid</option>
-                    </select>
+                    <label for="edit_payment_status_display">Driver Payment Status</label>
+                    <div class="custom-trigger">
+                        <input type="text" id="edit_payment_status_display" class="custom-trigger-input" placeholder="Select driver payment status" readonly>
+                        <input type="hidden" id="edit_payment_status" value="unpaid">
+                        <span class="custom-trigger-icon" aria-hidden="true">
+                            <svg class="icon-svg"><use href="#icon-chevron-down"></use></svg>
+                        </span>
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="payment_option">Broker Payment Option</label>
-                    <select id="payment_option">
-                        <option value="">Select payment option</option>
-                        <option value="standard">Standard Payment</option>
-                        <option value="quick_pay">Broker Quick Pay</option>
-                    </select>
+                    <label for="payment_option_display">Broker Payment Option</label>
+                    <div class="custom-trigger">
+                        <input type="text" id="payment_option_display" class="custom-trigger-input" placeholder="Select payment option" readonly>
+                        <input type="hidden" id="payment_option" value="">
+                        <span class="custom-trigger-icon" aria-hidden="true">
+                            <svg class="icon-svg"><use href="#icon-chevron-down"></use></svg>
+                        </span>
+                    </div>
                 </div>
 
                 <div class="form-group full-row">
@@ -1628,6 +1643,30 @@
 
         <div class="format-modal-footer">
             <button type="button" id="formatCloseBtn" class="small-btn">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="customSelectModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 560px !important;" onclick="event.stopPropagation()">
+        <h2 id="customSelectTitle">Select Option</h2>
+        <p class="modal-subtitle" id="customSelectSubtitle">Choose one value</p>
+
+        <div style="margin-bottom: 12px;">
+            <input
+                type="text"
+                id="customSelectSearch"
+                class="compact-input"
+                placeholder="Search..."
+            >
+        </div>
+
+        <div id="customSelectList" class="logs-list" style="max-height: 420px; overflow-y: auto;"></div>
+
+        <div class="modal-actions" style="margin-top: 16px;">
+            <div class="modal-actions-left">
+                <button type="button" id="customSelectCloseBtn" class="secondary-btn">Close</button>
+            </div>
         </div>
     </div>
 </div>

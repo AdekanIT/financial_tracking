@@ -3,33 +3,25 @@ const API_BASE_URL = "http://127.0.0.1:8000";
 const TOKEN_KEY = "access_token";
 const USER_KEY = "user_data";
 
-const MANAGER_ROLES = new Set(["manager", "accounting"]);
+const FULL_SALARY_ROLES = new Set(["manager", "accounting"]);
 
 let logoutBtn, toggleSidebarBtn, toggleNotesBtn;
-let toggleSalaryCheckPanelBtn, toggleGeneratePanelBtn, toggleDispatcherSalaryCheckPanelBtn;
+let toggleSalaryCheckPanelBtn, toggleGeneratePanelBtn;
 
-let salaryCheckCard, dispatcherSalaryCheckCard;
-let salaryCheckPanel, generateSalaryPanel, dispatcherSalaryCheckPanel, salaryNotesPanel;
+let salaryCheckCard, salaryCheckPanel, generateSalaryPanel, salaryNotesPanel;
 let salaryForm;
 
 let salaryStartDateInput, salaryEndDateInput;
-let dispatcherStartDateInput, dispatcherEndDateInput;
 let generateStartDateInput, generateEndDateInput;
 
 let salaryStartDatePickerBtn, salaryEndDatePickerBtn;
-let dispatcherStartDatePickerBtn, dispatcherEndDatePickerBtn;
 let generateStartDatePickerBtn, generateEndDatePickerBtn;
 
 let salaryViewModeInput, salaryViewModeDisplay;
-let dispatcherResultModeInput, dispatcherResultModeDisplay;
-
-let salaryViewModeField, salaryTableTypeField;
-
 let staffFullNameInput, staffIdInput, baseSalaryInput, customBonusInput, taxPercentInput;
 
 let loadPreviewBtn, loadRecordsBtn, exportPreviewBtn, exportExcelBtn;
 let runSalaryViewBtn, resetSalaryFiltersBtn, generateSalaryBtn, previewGenerateSalaryBtn;
-let dispatcherRunBtn, dispatcherResetBtn;
 
 let salaryStatusText, salaryResultInfo;
 let salaryPageTitle, salaryPageSubtitle, salaryTableTitle, salaryTableSubtitle;
@@ -57,13 +49,13 @@ let customNoticeMessage = null;
 let customNoticeConfirmBtn = null;
 
 const SELECT_OPTIONS = {
-    salaryViewMode: [
+    salaryViewModeFull: [
         { value: "preview_all", label: "Preview All" },
         { value: "preview_my", label: "My Preview" },
         { value: "records_all", label: "Saved Records" },
         { value: "record_my", label: "My Saved Record" }
     ],
-    dispatcherResultMode: [
+    salaryViewModeLimited: [
         { value: "preview_my", label: "My Preview" },
         { value: "record_my", label: "My Saved Record" }
     ]
@@ -87,8 +79,8 @@ function getCurrentUserRole() {
     return String(user?.job_title || "").trim().toLowerCase();
 }
 
-function isManagerRole() {
-    return MANAGER_ROLES.has(getCurrentUserRole());
+function isFullSalaryRole() {
+    return FULL_SALARY_ROLES.has(getCurrentUserRole());
 }
 
 function clearAuthAndRedirect() {
@@ -452,10 +444,6 @@ function getCheckRange() {
     return getRangeFromInputs(salaryStartDateInput, salaryEndDateInput);
 }
 
-function getDispatcherRange() {
-    return getRangeFromInputs(dispatcherStartDateInput, dispatcherEndDateInput);
-}
-
 function getGenerateRange() {
     return getRangeFromInputs(generateStartDateInput, generateEndDateInput);
 }
@@ -463,7 +451,7 @@ function getGenerateRange() {
 function setSalaryLabels() {
     if (!salaryPageTitle || !salaryPageSubtitle || !salaryTableTitle || !salaryTableSubtitle) return;
 
-    if (isManagerRole()) {
+    if (isFullSalaryRole()) {
         salaryPageTitle.textContent = "Salary Management";
         salaryPageSubtitle.textContent = "Check salary results by period and generate official salary records";
         salaryTableTitle.textContent = "Salary Result";
@@ -476,51 +464,130 @@ function setSalaryLabels() {
     }
 }
 
+function setSidebarLinkVisibility(href, allowedRoles) {
+    const role = getCurrentUserRole();
+
+    document.querySelectorAll(`a.nav-link[href="${href}"]`).forEach((el) => {
+        el.style.display = allowedRoles.includes(role) ? "" : "none";
+    });
+}
+
+function applySidebarRoleVisibility() {
+    setSidebarLinkVisibility("/users", ["manager"]);
+    setSidebarLinkVisibility("/archive", ["manager", "supervisor", "hr", "accounting"]);
+}
+
+
 function applyRoleBasedUI() {
-    const manager = isManagerRole();
+    const fullRole = isFullSalaryRole();
 
-    if (salaryCheckCard) {
-        salaryCheckCard.classList.toggle("hidden", !manager);
-    }
-
-    if (dispatcherSalaryCheckCard) {
-        dispatcherSalaryCheckCard.classList.toggle("hidden", manager);
-    }
-
-    if (exportPreviewBtn) {
-        exportPreviewBtn.classList.toggle("hidden", !manager);
-    }
-
-    if (exportExcelBtn) {
-        exportExcelBtn.classList.toggle("hidden", !manager);
-    }
-
-    if (loadPreviewBtn) {
-        loadPreviewBtn.classList.toggle("hidden", !manager);
-    }
-
-    if (loadRecordsBtn) {
-        loadRecordsBtn.classList.toggle("hidden", !manager);
-    }
-
-    if (toggleGeneratePanelBtn) {
-        toggleGeneratePanelBtn.classList.toggle("hidden", !manager);
-    }
+    if (loadPreviewBtn) loadPreviewBtn.classList.toggle("hidden", !fullRole);
+    if (loadRecordsBtn) loadRecordsBtn.classList.toggle("hidden", !fullRole);
+    if (exportPreviewBtn) exportPreviewBtn.classList.toggle("hidden", !fullRole);
+    if (exportExcelBtn) exportExcelBtn.classList.toggle("hidden", !fullRole);
+    if (toggleGeneratePanelBtn) toggleGeneratePanelBtn.classList.toggle("hidden", !fullRole);
+    if (previewGenerateSalaryBtn) previewGenerateSalaryBtn.classList.toggle("hidden", !fullRole);
 
     if (generateSalaryPanel) {
-        generateSalaryPanel.classList.toggle("hidden", !manager);
-        if (!manager) {
+        generateSalaryPanel.classList.toggle("hidden", !fullRole);
+        if (!fullRole) {
             generateSalaryPanel.classList.remove("open");
         }
     }
 
-    if (salaryViewModeField) {
-        salaryViewModeField.classList.toggle("hidden", !manager);
+    if (staffFullNameInput) staffFullNameInput.disabled = !fullRole;
+    if (staffIdInput) staffIdInput.disabled = !fullRole;
+    if (baseSalaryInput) baseSalaryInput.disabled = !fullRole;
+    if (customBonusInput) customBonusInput.disabled = !fullRole;
+    if (taxPercentInput) taxPercentInput.disabled = !fullRole;
+    if (generateSalaryBtn) generateSalaryBtn.disabled = !fullRole;
+    if (previewGenerateSalaryBtn) previewGenerateSalaryBtn.disabled = !fullRole;
+
+    const options = fullRole ? SELECT_OPTIONS.salaryViewModeFull : SELECT_OPTIONS.salaryViewModeLimited;
+    const defaultValue = fullRole ? "preview_all" : "preview_my";
+
+    if (salaryViewModeInput) {
+        salaryViewModeInput.value = defaultValue;
     }
 
-    if (salaryTableTypeField) {
-        // compatibility placeholder
+    if (salaryViewModeDisplay) {
+        salaryViewModeDisplay.value = (options.find(item => item.value === defaultValue) || {}).label || "";
     }
+
+    if (!fullRole) {
+        setStatus("Limited access");
+        setResultInfo("Only your own preview and saved salary records are available.");
+    }
+
+    applySidebarRoleVisibility();
+}
+
+function getCurrentSelectOptions() {
+    return isFullSalaryRole() ? SELECT_OPTIONS.salaryViewModeFull : SELECT_OPTIONS.salaryViewModeLimited;
+}
+
+function setSelectValue(targetName, value) {
+    if (targetName !== "salaryViewMode") return;
+
+    const options = getCurrentSelectOptions();
+    const matched = options.find(item => item.value === value) || options[0];
+
+    if (salaryViewModeInput) salaryViewModeInput.value = matched.value;
+    if (salaryViewModeDisplay) salaryViewModeDisplay.value = matched.label;
+}
+
+function openSelectModal(targetName, title = "Select Option") {
+    if (targetName !== "salaryViewMode") return;
+    if (!salarySelectModal || !salarySelectOptionList) return;
+
+    currentSelectTarget = targetName;
+    salarySelectModalTitle.textContent = title;
+    salarySelectOptionList.innerHTML = "";
+
+    getCurrentSelectOptions().forEach((option) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "select-option-btn";
+        btn.textContent = option.label;
+        btn.addEventListener("click", () => {
+            setSelectValue(targetName, option.value);
+            closeSelectModal();
+        });
+        salarySelectOptionList.appendChild(btn);
+    });
+
+    salarySelectModal.classList.remove("hidden");
+    salarySelectModal.style.display = "flex";
+}
+
+function closeSelectModal() {
+    currentSelectTarget = null;
+    if (!salarySelectModal) return;
+    salarySelectModal.style.display = "none";
+    salarySelectModal.classList.add("hidden");
+}
+
+function parseErrorResponse(response, fallbackMessage) {
+    return response.json()
+        .then((data) => {
+            if (typeof data.detail === "string") return data.detail;
+            if (typeof data.error === "string") return data.error;
+            if (typeof data.message === "string") return data.message;
+            return fallbackMessage;
+        })
+        .catch(() => fallbackMessage);
+}
+
+function getQueryString(params) {
+    const search = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && String(value).trim() !== "") {
+            search.append(key, value);
+        }
+    });
+
+    return search.toString();
 }
 
 function getSortValue(row, key) {
@@ -680,15 +747,9 @@ function renderPreviewTable(rows) {
         tr.appendChild(createRoleCell(row.job_title || "—"));
         tr.appendChild(createCell(row.period_start || "—"));
         tr.appendChild(createCell(row.period_end || "—"));
-        tr.appendChild(createCell(row.total_shipments ?? 0));
-        tr.appendChild(createCell(formatCurrency(row.total_profit || 0), "money-neutral"));
+        tr.appendChild(createCell(row.total_shipments ?? "—"));
+        tr.appendChild(createCell(formatCurrency(row.total_profit || 0)));
         tr.appendChild(createCell(formatCurrency(row.estimated_salary || 0), "money-positive"));
-        tr.appendChild(createCell("—"));
-        tr.appendChild(createCell("—"));
-        tr.appendChild(createCell("—"));
-        tr.appendChild(createCell("—"));
-        tr.appendChild(createCell("—"));
-        tr.appendChild(createCell("—"));
 
         salaryTableBody.appendChild(tr);
     });
@@ -791,85 +852,6 @@ function renderSalaryTable(rows, mode) {
     setSortIndicators();
 }
 
-function getQueryString(params) {
-    const search = new URLSearchParams();
-
-    Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && String(value).trim() !== "") {
-            search.append(key, value);
-        }
-    });
-
-    return search.toString();
-}
-
-async function parseErrorResponse(response, fallbackMessage) {
-    let data = {};
-    try {
-        data = await response.json();
-    } catch {
-        return fallbackMessage;
-    }
-
-    if (typeof data.detail === "string") return data.detail;
-    if (typeof data.error === "string") return data.error;
-    if (typeof data.message === "string") return data.message;
-    return fallbackMessage;
-}
-
-function getSelectLabel(selectName, value) {
-    const options = SELECT_OPTIONS[selectName] || [];
-    const found = options.find((item) => item.value === value);
-    return found ? found.label : "";
-}
-
-function setSelectValue(selectName, value) {
-    if (selectName === "salaryViewMode") {
-        if (salaryViewModeInput) salaryViewModeInput.value = value;
-        if (salaryViewModeDisplay) salaryViewModeDisplay.value = getSelectLabel(selectName, value);
-        return;
-    }
-
-    if (selectName === "dispatcherResultMode") {
-        if (dispatcherResultModeInput) dispatcherResultModeInput.value = value;
-        if (dispatcherResultModeDisplay) dispatcherResultModeDisplay.value = getSelectLabel(selectName, value);
-    }
-}
-
-function openSelectModal(targetName, titleText) {
-    currentSelectTarget = targetName;
-    if (!salarySelectModal || !salarySelectOptionList) return;
-
-    const options = SELECT_OPTIONS[targetName] || [];
-    salarySelectOptionList.innerHTML = "";
-
-    if (salarySelectModalTitle) {
-        salarySelectModalTitle.textContent = titleText || "Select Option";
-    }
-
-    options.forEach((option) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "select-option-btn";
-        btn.textContent = option.label;
-        btn.addEventListener("click", () => {
-            setSelectValue(targetName, option.value);
-            closeSelectModal();
-        });
-        salarySelectOptionList.appendChild(btn);
-    });
-
-    salarySelectModal.classList.remove("hidden");
-    salarySelectModal.style.display = "flex";
-}
-
-function closeSelectModal() {
-    currentSelectTarget = null;
-    if (!salarySelectModal) return;
-    salarySelectModal.style.display = "none";
-    salarySelectModal.classList.add("hidden");
-}
-
 async function loadPreviewData(rangeOverride = null, forceMine = false) {
     const range = rangeOverride || getCheckRange();
     if (range.error) {
@@ -945,9 +927,16 @@ async function loadSavedRecords(rangeOverride = null, forceMine = false) {
 }
 
 async function runSelectedView() {
-    if (!isManagerRole()) return;
+    const selectedView = salaryViewModeInput?.value || (isFullSalaryRole() ? "preview_all" : "preview_my");
 
-    const selectedView = salaryViewModeInput?.value || "preview_all";
+    if (!isFullSalaryRole()) {
+        if (selectedView === "record_my") {
+            await loadSavedRecords(null, true);
+        } else {
+            await loadPreviewData(null, true);
+        }
+        return;
+    }
 
     if (selectedView === "records_all") {
         await loadSavedRecords(null, false);
@@ -965,24 +954,6 @@ async function runSelectedView() {
     }
 
     await loadPreviewData(null, false);
-}
-
-async function runDispatcherView() {
-    if (isManagerRole()) return;
-
-    const range = getDispatcherRange();
-    if (range.error) {
-        showNotice(range.error, "Date Required");
-        return;
-    }
-
-    const mode = dispatcherResultModeInput?.value || "preview_my";
-
-    if (mode === "record_my") {
-        await loadSavedRecords(range, true);
-    } else {
-        await loadPreviewData(range, true);
-    }
 }
 
 function buildGeneratePayloadFromForm() {
@@ -1015,7 +986,7 @@ function buildGeneratePayloadFromForm() {
 }
 
 async function previewGenerateSalary() {
-    if (!isManagerRole()) return;
+    if (!isFullSalaryRole()) return;
 
     const built = buildGeneratePayloadFromForm();
     if (built.error) {
@@ -1064,8 +1035,8 @@ async function previewGenerateSalary() {
 }
 
 async function generateSalary() {
-    if (!isManagerRole()) {
-        showNotice("Only manager or accounting roles can generate official salary records.", "Access Denied");
+    if (getCurrentUserRole() !== "manager") {
+        showNotice("Only manager can generate official salary records.", "Access Denied");
         return;
     }
 
@@ -1086,46 +1057,44 @@ async function generateSalary() {
 
     setStatus("Generating salary...");
 
-    try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/salary/generate?${getQueryString(built.payload)}`, {
-            method: "POST"
-        });
+    const response = await fetchWithAuth(`${API_BASE_URL}/salary/generate?${getQueryString(built.payload)}`, {
+        method: "POST"
+    });
 
-        if (!response) {
-            setStatus("Failed to generate");
-            return;
-        }
-
-        if (!response.ok) {
-            const message = await parseErrorResponse(response, "Failed to generate salary record.");
-            showNotice(message, "Generation Error");
-            setStatus("Generation failed");
-            return;
-        }
-
-        const data = await response.json();
-        showNotice(data.message || "Salary record created successfully.", "Success");
-        setStatus("Salary generated");
-
-        setSelectValue("salaryViewMode", "records_all");
-        await loadSavedRecords(getGenerateRange(), false);
-
-    } catch (err) {
-        console.error("Generate salary error:", err);
-        showNotice("Server error while generating salary record.", "Server Error");
-        setStatus("Generation failed");
-    } finally {
+    if (!response) {
         isGeneratingSalary = false;
-
         if (generateSalaryBtn) {
             generateSalaryBtn.disabled = false;
             generateSalaryBtn.textContent = "Generate Official Salary";
         }
+        return;
+    }
+
+    if (!response.ok) {
+        const message = await parseErrorResponse(response, "Failed to generate salary.");
+        setStatus("Error");
+        showNotice(message, "Generate Error");
+        isGeneratingSalary = false;
+        if (generateSalaryBtn) {
+            generateSalaryBtn.disabled = false;
+            generateSalaryBtn.textContent = "Generate Official Salary";
+        }
+        return;
+    }
+
+    const data = await response.json();
+    showNotice(data.message || "Salary generated successfully.", "Success");
+    setStatus("Salary generated");
+
+    isGeneratingSalary = false;
+    if (generateSalaryBtn) {
+        generateSalaryBtn.disabled = false;
+        generateSalaryBtn.textContent = "Generate Official Salary";
     }
 }
 
-async function openExportPreview() {
-    if (!isManagerRole()) return;
+function openExportPreview() {
+    if (!isFullSalaryRole()) return;
 
     const range = getCheckRange();
     if (range.error) {
@@ -1133,13 +1102,11 @@ async function openExportPreview() {
         return;
     }
 
-    setStatus("Opening export preview...");
-    const qs = getQueryString(range);
-    window.location.href = `/excel?${qs}`;
+    window.location.href = `/excel?${getQueryString(range)}`;
 }
 
 async function downloadExcel() {
-    if (!isManagerRole()) return;
+    if (!isFullSalaryRole()) return;
 
     const range = getCheckRange();
     if (range.error) {
@@ -1147,480 +1114,52 @@ async function downloadExcel() {
         return;
     }
 
-    setStatus("Downloading Excel...");
+    setStatus("Preparing Excel...");
 
-    const qs = getQueryString(range);
-    const response = await fetchWithAuth(`${API_BASE_URL}/salary/export?${qs}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/salary/export?${getQueryString(range)}`, {
         method: "GET"
     });
 
     if (!response) {
-        setStatus("Download failed");
+        setStatus("Failed");
         return;
     }
 
     if (!response.ok) {
         const message = await parseErrorResponse(response, "Failed to download Excel.");
-        showNotice(message, "Download Error");
-        setStatus("Download failed");
+        setStatus("Error");
+        showNotice(message, "Export Error");
         return;
     }
 
     const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
 
-    let fileName = "salary_export.xlsx";
-    const contentDisposition = response.headers.get("Content-Disposition");
-    if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^"]+)"?/i);
-        if (match && match[1]) {
-            fileName = match[1];
-        }
-    }
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = "salary_export.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
 
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    window.URL.revokeObjectURL(blobUrl);
     setStatus("Excel downloaded");
 }
 
-function resetTableAndSummary() {
-    currentSalaryRows = [];
-    currentTableMode = "preview";
-    currentSortKey = null;
-    currentSortDirection = "asc";
-    setSortIndicators();
+function resetSalaryFilters() {
+    if (salaryStartDateInput) salaryStartDateInput.value = "";
+    if (salaryEndDateInput) salaryEndDateInput.value = "";
 
-    if (summaryTotalRecords) summaryTotalRecords.textContent = "0";
-    if (summaryTotalGross) summaryTotalGross.textContent = "$0";
-    if (summaryTotalTax) summaryTotalTax.textContent = "$0";
-    if (summaryTotalNet) summaryTotalNet.textContent = "$0";
+    const defaultValue = isFullSalaryRole() ? "preview_all" : "preview_my";
+    setSelectValue("salaryViewMode", defaultValue);
 
-    showEmptyTable("Load salary data to see results.");
+    showEmptyTable("No salary data found.");
+    updateSummaryCards([], "preview");
     setStatus("Ready");
-    setResultInfo("No data loaded yet");
+    setResultInfo("No preview loaded yet");
 }
 
-function resetManagerFilters() {
-    if (salaryStartDateInput) {
-        salaryStartDateInput.value = "";
-        salaryStartDateInput.classList.remove("field-error");
-    }
-
-    if (salaryEndDateInput) {
-        salaryEndDateInput.value = "";
-        salaryEndDateInput.classList.remove("field-error");
-    }
-
-    setSelectValue("salaryViewMode", "preview_all");
-
-    if (generateStartDateInput) {
-        generateStartDateInput.value = "";
-        generateStartDateInput.classList.remove("field-error");
-    }
-
-    if (generateEndDateInput) {
-        generateEndDateInput.value = "";
-        generateEndDateInput.classList.remove("field-error");
-    }
-
-    if (staffFullNameInput) staffFullNameInput.value = "";
-    if (staffIdInput) staffIdInput.value = "";
-    if (baseSalaryInput) baseSalaryInput.value = "";
-    if (customBonusInput) customBonusInput.value = "";
-    if (taxPercentInput) taxPercentInput.value = "";
-
-    resetTableAndSummary();
-}
-
-function resetDispatcherFilters() {
-    if (dispatcherStartDateInput) {
-        dispatcherStartDateInput.value = "";
-        dispatcherStartDateInput.classList.remove("field-error");
-    }
-
-    if (dispatcherEndDateInput) {
-        dispatcherEndDateInput.value = "";
-        dispatcherEndDateInput.classList.remove("field-error");
-    }
-
-    setSelectValue("dispatcherResultMode", "preview_my");
-    resetTableAndSummary();
-}
-
-function openDatePickerFor(inputId, titleText) {
-    datePickerTargetInputId = inputId;
-
-    if (dateModalTitle) {
-        dateModalTitle.textContent = titleText || "Select Date";
-    }
-
-    const input = document.getElementById(inputId);
-    const parsed = parseSlashDate(input?.value);
-    datePickerViewDate = parsed || new Date();
-
-    renderDatePickerGrid();
-
-    if (datePickerModal) {
-        datePickerModal.style.display = "flex";
-    }
-}
-
-function closeDatePickerModal() {
-    if (datePickerModal) datePickerModal.style.display = "none";
-    datePickerTargetInputId = null;
-}
-
-function renderDatePickerGrid() {
-    if (!dateGrid || !dateCurrentMonthLabel) return;
-
-    const year = datePickerViewDate.getFullYear();
-    const month = datePickerViewDate.getMonth();
-
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-
-    dateCurrentMonthLabel.textContent = datePickerViewDate.toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric"
-    });
-
-    dateGrid.innerHTML = "";
-
-    const mondayBasedFirstDay = (firstDay.getDay() + 6) % 7;
-    const daysInMonth = lastDay.getDate();
-    const prevMonthLastDay = new Date(year, month, 0).getDate();
-
-    for (let i = 0; i < mondayBasedFirstDay; i++) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "date-day-btn muted";
-        btn.textContent = String(prevMonthLastDay - mondayBasedFirstDay + i + 1);
-        btn.tabIndex = -1;
-        dateGrid.appendChild(btn);
-    }
-
-    const targetInput = datePickerTargetInputId ? document.getElementById(datePickerTargetInputId) : null;
-    const selectedDate = parseSlashDate(targetInput?.value);
-
-    for (let day = 1; day <= daysInMonth; day++) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "date-day-btn";
-        btn.textContent = String(day);
-
-        const currentDate = new Date(year, month, day);
-
-        if (
-            selectedDate &&
-            selectedDate.getFullYear() === currentDate.getFullYear() &&
-            selectedDate.getMonth() === currentDate.getMonth() &&
-            selectedDate.getDate() === currentDate.getDate()
-        ) {
-            btn.classList.add("active");
-        }
-
-        btn.addEventListener("click", () => {
-            if (!datePickerTargetInputId) return;
-            const input = document.getElementById(datePickerTargetInputId);
-            if (!input) return;
-
-            input.value = formatDateToSlash(currentDate);
-            input.classList.remove("field-error");
-            closeDatePickerModal();
-        });
-
-        dateGrid.appendChild(btn);
-    }
-
-    const totalCells = mondayBasedFirstDay + daysInMonth;
-    const trailingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
-
-    for (let i = 1; i <= trailingCells; i++) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "date-day-btn muted";
-        btn.textContent = String(i);
-        btn.tabIndex = -1;
-        dateGrid.appendChild(btn);
-    }
-}
-
-function cacheElements() {
-    logoutBtn = document.getElementById("logoutBtn");
-    toggleSidebarBtn = document.getElementById("toggleSidebarBtn");
-    toggleNotesBtn = document.getElementById("toggleNotesBtn");
-    toggleSalaryCheckPanelBtn = document.getElementById("toggleSalaryCheckPanelBtn");
-    toggleGeneratePanelBtn = document.getElementById("toggleGeneratePanelBtn");
-    toggleDispatcherSalaryCheckPanelBtn = document.getElementById("toggleDispatcherSalaryCheckPanelBtn");
-
-    salaryCheckCard = document.getElementById("salaryCheckCard");
-    dispatcherSalaryCheckCard = document.getElementById("dispatcherSalaryCheckCard");
-    salaryCheckPanel = document.getElementById("salaryCheckPanel");
-    generateSalaryPanel = document.getElementById("generateSalaryPanel");
-    dispatcherSalaryCheckPanel = document.getElementById("dispatcherSalaryCheckPanel");
-    salaryNotesPanel = document.getElementById("salaryNotesPanel");
-    salaryForm = document.getElementById("salaryForm");
-
-    salaryStartDateInput = document.getElementById("salaryStartDate");
-    salaryEndDateInput = document.getElementById("salaryEndDate");
-    dispatcherStartDateInput = document.getElementById("dispatcherStartDate");
-    dispatcherEndDateInput = document.getElementById("dispatcherEndDate");
-    generateStartDateInput = document.getElementById("generateStartDate");
-    generateEndDateInput = document.getElementById("generateEndDate");
-
-    salaryStartDatePickerBtn = document.getElementById("salaryStartDatePickerBtn");
-    salaryEndDatePickerBtn = document.getElementById("salaryEndDatePickerBtn");
-    dispatcherStartDatePickerBtn = document.getElementById("dispatcherStartDatePickerBtn");
-    dispatcherEndDatePickerBtn = document.getElementById("dispatcherEndDatePickerBtn");
-    generateStartDatePickerBtn = document.getElementById("generateStartDatePickerBtn");
-    generateEndDatePickerBtn = document.getElementById("generateEndDatePickerBtn");
-
-    salaryViewModeInput = document.getElementById("salaryViewMode");
-    salaryViewModeDisplay = document.getElementById("salaryViewModeDisplay");
-
-    dispatcherResultModeInput = document.getElementById("dispatcherResultMode");
-    dispatcherResultModeDisplay = document.getElementById("dispatcherResultModeDisplay");
-
-    salaryViewModeField = document.getElementById("salaryViewModeField");
-    salaryTableTypeField = document.getElementById("salaryTableTypeField");
-
-    staffFullNameInput = document.getElementById("staffFullName");
-    staffIdInput = document.getElementById("staffId");
-    baseSalaryInput = document.getElementById("baseSalary");
-    customBonusInput = document.getElementById("customBonus");
-    taxPercentInput = document.getElementById("taxPercent");
-
-    loadPreviewBtn = document.getElementById("loadPreviewBtn");
-    loadRecordsBtn = document.getElementById("loadRecordsBtn");
-    exportPreviewBtn = document.getElementById("exportPreviewBtn");
-    exportExcelBtn = document.getElementById("exportExcelBtn");
-    runSalaryViewBtn = document.getElementById("runSalaryViewBtn");
-    resetSalaryFiltersBtn = document.getElementById("resetSalaryFiltersBtn");
-    generateSalaryBtn = document.getElementById("generateSalaryBtn");
-    previewGenerateSalaryBtn = document.getElementById("previewGenerateSalaryBtn");
-    dispatcherRunBtn = document.getElementById("dispatcherRunBtn");
-    dispatcherResetBtn = document.getElementById("dispatcherResetBtn");
-
-    salaryStatusText = document.getElementById("salaryStatusText");
-    salaryResultInfo = document.getElementById("salaryResultInfo");
-    salaryPageTitle = document.getElementById("salaryPageTitle");
-    salaryPageSubtitle = document.getElementById("salaryPageSubtitle");
-    salaryTableTitle = document.getElementById("salaryTableTitle");
-    salaryTableSubtitle = document.getElementById("salaryTableSubtitle");
-    salaryTableBody = document.getElementById("salaryTableBody");
-
-    summaryTotalRecords = document.getElementById("summaryTotalRecords");
-    summaryTotalGross = document.getElementById("summaryTotalGross");
-    summaryTotalTax = document.getElementById("summaryTotalTax");
-    summaryTotalNet = document.getElementById("summaryTotalNet");
-
-    datePickerModal = document.getElementById("datePickerModal");
-    datePrevMonthBtn = document.getElementById("datePrevMonthBtn");
-    dateNextMonthBtn = document.getElementById("dateNextMonthBtn");
-    dateGrid = document.getElementById("dateGrid");
-    dateCurrentMonthLabel = document.getElementById("dateCurrentMonthLabel");
-    dateCloseBtn = document.getElementById("dateCloseBtn");
-    dateClearBtn = document.getElementById("dateClearBtn");
-    dateModalTitle = document.getElementById("dateModalTitle");
-
-    salarySelectModal = document.getElementById("salarySelectModal");
-    salarySelectModalTitle = document.getElementById("salarySelectModalTitle");
-    salarySelectOptionList = document.getElementById("salarySelectOptionList");
-    salarySelectCloseBtn = document.getElementById("salarySelectCloseBtn");
-}
-
-function bindDateInputs() {
-    [
-        salaryStartDateInput,
-        salaryEndDateInput,
-        dispatcherStartDateInput,
-        dispatcherEndDateInput,
-        generateStartDateInput,
-        generateEndDateInput
-    ].forEach((input) => normalizeDateTyping(input));
-}
-
-function bindDatePickerButtons() {
-    const mapping = [
-        [salaryStartDatePickerBtn, "salaryStartDate", "Select Start Date"],
-        [salaryEndDatePickerBtn, "salaryEndDate", "Select End Date"],
-        [dispatcherStartDatePickerBtn, "dispatcherStartDate", "Select Start Date"],
-        [dispatcherEndDatePickerBtn, "dispatcherEndDate", "Select End Date"],
-        [generateStartDatePickerBtn, "generateStartDate", "Select Start Date"],
-        [generateEndDatePickerBtn, "generateEndDate", "Select End Date"]
-    ];
-
-    mapping.forEach(([btn, inputId, title]) => {
-        if (!btn) return;
-        btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openDatePickerFor(inputId, title);
-        });
-    });
-}
-
-function bindPanelToggles() {
-    if (toggleSidebarBtn) {
-        toggleSidebarBtn.addEventListener("click", toggleSidebar);
-    }
-
-    if (toggleNotesBtn) {
-        toggleNotesBtn.addEventListener("click", () => togglePanel(salaryNotesPanel));
-    }
-
-    if (toggleSalaryCheckPanelBtn) {
-        toggleSalaryCheckPanelBtn.addEventListener("click", () => togglePanel(salaryCheckPanel));
-    }
-
-    if (toggleGeneratePanelBtn) {
-        toggleGeneratePanelBtn.addEventListener("click", () => {
-            if (!isManagerRole() || !generateSalaryPanel) return;
-            generateSalaryPanel.classList.toggle("hidden");
-            generateSalaryPanel.classList.toggle("open");
-        });
-    }
-
-    if (toggleDispatcherSalaryCheckPanelBtn) {
-        toggleDispatcherSalaryCheckPanelBtn.addEventListener("click", () => togglePanel(dispatcherSalaryCheckPanel));
-    }
-}
-
-function bindSelectTriggers() {
-    if (salaryViewModeDisplay) {
-        salaryViewModeDisplay.addEventListener("click", () => {
-            if (!isManagerRole()) return;
-            openSelectModal("salaryViewMode", "Select View Mode");
-        });
-    }
-
-    if (dispatcherResultModeDisplay) {
-        dispatcherResultModeDisplay.addEventListener("click", () => {
-            if (isManagerRole()) return;
-            openSelectModal("dispatcherResultMode", "Select Result Type");
-        });
-    }
-}
-
-function bindActions() {
-    if (logoutBtn) {
-        logoutBtn.addEventListener("click", logout);
-    }
-
-    if (loadPreviewBtn) {
-        loadPreviewBtn.addEventListener("click", async () => {
-            if (!isManagerRole()) return;
-            setSelectValue("salaryViewMode", "preview_all");
-            await loadPreviewData();
-        });
-    }
-
-    if (loadRecordsBtn) {
-        loadRecordsBtn.addEventListener("click", async () => {
-            if (!isManagerRole()) return;
-            setSelectValue("salaryViewMode", "records_all");
-            await loadSavedRecords();
-        });
-    }
-
-    if (runSalaryViewBtn) {
-        runSalaryViewBtn.addEventListener("click", runSelectedView);
-    }
-
-    if (resetSalaryFiltersBtn) {
-        resetSalaryFiltersBtn.addEventListener("click", resetManagerFilters);
-    }
-
-    if (previewGenerateSalaryBtn) {
-        previewGenerateSalaryBtn.addEventListener("click", previewGenerateSalary);
-    }
-
-    if (generateSalaryBtn) {
-        generateSalaryBtn.addEventListener("click", generateSalary);
-    }
-
-    if (exportPreviewBtn) {
-        exportPreviewBtn.addEventListener("click", openExportPreview);
-    }
-
-    if (exportExcelBtn) {
-        exportExcelBtn.addEventListener("click", downloadExcel);
-    }
-
-    if (dispatcherRunBtn) {
-        dispatcherRunBtn.addEventListener("click", runDispatcherView);
-    }
-
-    if (dispatcherResetBtn) {
-        dispatcherResetBtn.addEventListener("click", resetDispatcherFilters);
-    }
-
-    if (salaryForm) {
-        salaryForm.addEventListener("submit", (e) => e.preventDefault());
-    }
-}
-
-function bindDateModal() {
-    if (datePrevMonthBtn) {
-        datePrevMonthBtn.addEventListener("click", () => {
-            datePickerViewDate = new Date(datePickerViewDate.getFullYear(), datePickerViewDate.getMonth() - 1, 1);
-            renderDatePickerGrid();
-        });
-    }
-
-    if (dateNextMonthBtn) {
-        dateNextMonthBtn.addEventListener("click", () => {
-            datePickerViewDate = new Date(datePickerViewDate.getFullYear(), datePickerViewDate.getMonth() + 1, 1);
-            renderDatePickerGrid();
-        });
-    }
-
-    if (dateCloseBtn) {
-        dateCloseBtn.addEventListener("click", closeDatePickerModal);
-    }
-
-    if (dateClearBtn) {
-        dateClearBtn.addEventListener("click", () => {
-            if (datePickerTargetInputId) {
-                const input = document.getElementById(datePickerTargetInputId);
-                if (input) {
-                    input.value = "";
-                    input.classList.remove("field-error");
-                }
-            }
-            closeDatePickerModal();
-        });
-    }
-
-    if (datePickerModal) {
-        datePickerModal.addEventListener("click", (e) => {
-            if (e.target === datePickerModal) {
-                closeDatePickerModal();
-            }
-        });
-    }
-}
-
-function bindSelectModal() {
-    if (salarySelectCloseBtn) {
-        salarySelectCloseBtn.addEventListener("click", closeSelectModal);
-    }
-
-    if (salarySelectModal) {
-        salarySelectModal.addEventListener("click", (e) => {
-            if (e.target === salarySelectModal) {
-                closeSelectModal();
-            }
-        });
-    }
-}
-
-function bindSorting() {
+function bindSortHandlers() {
     document.querySelectorAll(".sortable-header").forEach((th) => {
         th.addEventListener("click", () => {
             const key = th.dataset.sortKey;
@@ -1639,41 +1178,142 @@ function bindSorting() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    if (!getToken()) {
-        clearAuthAndRedirect();
-        return;
-    }
+    logoutBtn = document.getElementById("logoutBtn");
+    toggleSidebarBtn = document.getElementById("toggleSidebarBtn");
+    toggleNotesBtn = document.getElementById("toggleNotesBtn");
 
-    cacheElements();
-    bindDateInputs();
-    bindDatePickerButtons();
-    bindPanelToggles();
-    bindSelectTriggers();
-    bindActions();
-    bindDateModal();
-    bindSelectModal();
-    bindSorting();
-    ensureNoticeModal();
+    toggleSalaryCheckPanelBtn = document.getElementById("toggleSalaryCheckPanelBtn");
+    toggleGeneratePanelBtn = document.getElementById("toggleGeneratePanelBtn");
+
+    salaryCheckCard = document.getElementById("salaryCheckCard");
+    salaryCheckPanel = document.getElementById("salaryCheckPanel");
+    generateSalaryPanel = document.getElementById("generateSalaryPanel");
+    salaryNotesPanel = document.getElementById("salaryNotesPanel");
+
+    salaryForm = document.getElementById("salaryForm");
+
+    salaryStartDateInput = document.getElementById("salaryStartDate");
+    salaryEndDateInput = document.getElementById("salaryEndDate");
+    generateStartDateInput = document.getElementById("generateStartDate");
+    generateEndDateInput = document.getElementById("generateEndDate");
+
+    salaryStartDatePickerBtn = document.getElementById("salaryStartDatePickerBtn");
+    salaryEndDatePickerBtn = document.getElementById("salaryEndDatePickerBtn");
+    generateStartDatePickerBtn = document.getElementById("generateStartDatePickerBtn");
+    generateEndDatePickerBtn = document.getElementById("generateEndDatePickerBtn");
+
+    salaryViewModeInput = document.getElementById("salaryViewMode");
+    salaryViewModeDisplay = document.getElementById("salaryViewModeDisplay");
+
+    staffFullNameInput = document.getElementById("staffFullName");
+    staffIdInput = document.getElementById("staffId");
+    baseSalaryInput = document.getElementById("baseSalary");
+    customBonusInput = document.getElementById("customBonus");
+    taxPercentInput = document.getElementById("taxPercent");
+
+    loadPreviewBtn = document.getElementById("loadPreviewBtn");
+    loadRecordsBtn = document.getElementById("loadRecordsBtn");
+    exportPreviewBtn = document.getElementById("exportPreviewBtn");
+    exportExcelBtn = document.getElementById("exportExcelBtn");
+    runSalaryViewBtn = document.getElementById("runSalaryViewBtn");
+    resetSalaryFiltersBtn = document.getElementById("resetSalaryFiltersBtn");
+    generateSalaryBtn = document.getElementById("generateSalaryBtn");
+    previewGenerateSalaryBtn = document.getElementById("previewGenerateSalaryBtn");
+
+    salaryStatusText = document.getElementById("salaryStatusText");
+    salaryResultInfo = document.getElementById("salaryResultInfo");
+    salaryPageTitle = document.getElementById("salaryPageTitle");
+    salaryPageSubtitle = document.getElementById("salaryPageSubtitle");
+    salaryTableTitle = document.getElementById("salaryTableTitle");
+    salaryTableSubtitle = document.getElementById("salaryTableSubtitle");
+    salaryTableBody = document.getElementById("salaryTableBody");
+    summaryTotalRecords = document.getElementById("summaryTotalRecords");
+    summaryTotalGross = document.getElementById("summaryTotalGross");
+    summaryTotalTax = document.getElementById("summaryTotalTax");
+    summaryTotalNet = document.getElementById("summaryTotalNet");
+
+    datePickerModal = document.getElementById("datePickerModal");
+    datePrevMonthBtn = document.getElementById("datePrevMonthBtn");
+    dateNextMonthBtn = document.getElementById("dateNextMonthBtn");
+    dateGrid = document.getElementById("dateGrid");
+    dateCurrentMonthLabel = document.getElementById("dateCurrentMonthLabel");
+    dateCloseBtn = document.getElementById("dateCloseBtn");
+    dateClearBtn = document.getElementById("dateClearBtn");
+    dateModalTitle = document.getElementById("dateModalTitle");
+
+    salarySelectModal = document.getElementById("salarySelectModal");
+    salarySelectModalTitle = document.getElementById("salarySelectModalTitle");
+    salarySelectOptionList = document.getElementById("salarySelectOptionList");
+    salarySelectCloseBtn = document.getElementById("salarySelectCloseBtn");
 
     setSalaryLabels();
     applyRoleBasedUI();
-    setSortIndicators();
+    applySidebarRoleVisibility();
 
-    if (salaryNotesPanel) {
-        salaryNotesPanel.classList.remove("open");
-    }
+    [
+        salaryStartDateInput,
+        salaryEndDateInput,
+        generateStartDateInput,
+        generateEndDateInput
+    ].forEach(normalizeDateTyping);
 
-    if (isManagerRole()) {
-        if (salaryCheckPanel) salaryCheckPanel.classList.add("open");
-        if (generateSalaryPanel) {
-            generateSalaryPanel.classList.add("hidden");
-            generateSalaryPanel.classList.remove("open");
+    logoutBtn?.addEventListener("click", logout);
+    toggleSidebarBtn?.addEventListener("click", toggleSidebar);
+    toggleNotesBtn?.addEventListener("click", () => togglePanel(salaryNotesPanel));
+    toggleSalaryCheckPanelBtn?.addEventListener("click", () => togglePanel(salaryCheckPanel));
+
+    toggleGeneratePanelBtn?.addEventListener("click", () => {
+        if (!isFullSalaryRole()) return;
+        togglePanel(generateSalaryPanel);
+    });
+
+    salaryViewModeDisplay?.addEventListener("click", () => {
+        openSelectModal("salaryViewMode", "Select Salary View");
+    });
+
+    salarySelectCloseBtn?.addEventListener("click", closeSelectModal);
+
+    salarySelectModal?.addEventListener("click", (e) => {
+        if (e.target === salarySelectModal) {
+            closeSelectModal();
         }
+    });
+
+    loadPreviewBtn?.addEventListener("click", async () => {
+        if (!isFullSalaryRole()) return;
         setSelectValue("salaryViewMode", "preview_all");
-        resetManagerFilters();
-    } else {
-        if (dispatcherSalaryCheckPanel) dispatcherSalaryCheckPanel.classList.add("open");
-        setSelectValue("dispatcherResultMode", "preview_my");
-        resetDispatcherFilters();
-    }
+        await loadPreviewData(null, false);
+    });
+
+    loadRecordsBtn?.addEventListener("click", async () => {
+        if (!isFullSalaryRole()) return;
+        setSelectValue("salaryViewMode", "records_all");
+        await loadSavedRecords(null, false);
+    });
+
+    runSalaryViewBtn?.addEventListener("click", async () => {
+        await runSelectedView();
+    });
+
+    resetSalaryFiltersBtn?.addEventListener("click", resetSalaryFilters);
+
+    exportPreviewBtn?.addEventListener("click", openExportPreview);
+    exportExcelBtn?.addEventListener("click", downloadExcel);
+    previewGenerateSalaryBtn?.addEventListener("click", previewGenerateSalary);
+
+    salaryForm?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await generateSalary();
+    });
+
+    generateSalaryBtn?.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await generateSalary();
+    });
+
+    bindSortHandlers();
+    showEmptyTable("No salary data found.");
+    updateSummaryCards([], "preview");
+    setStatus("Ready");
+    setResultInfo("No preview loaded yet");
 });

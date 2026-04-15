@@ -5,6 +5,7 @@ const USER_KEY = "user_data";
 
 const MANAGER_ONLY_ROLES = new Set(["manager"]);
 const USER_ADMIN_ROLES = new Set(["manager", "hr"]);
+const USERS_PAGE_ROLES = new Set(["manager", "hr", "supervisor"]);
 
 let logoutBtn, toggleSidebarBtn, toggleNotesBtn, toggleFiltersBtn;
 let refreshUsersBtn, openCreateUserBtn, openPasswordModalBtn, previewUsersBtn;
@@ -93,6 +94,14 @@ function isUserAdminRole() {
     return USER_ADMIN_ROLES.has(getCurrentUserRole());
 }
 
+function canAccessUsersPage() {
+    return USERS_PAGE_ROLES.has(getCurrentUserRole());
+}
+
+function isSupervisorViewOnly() {
+    return getCurrentUserRole() === "supervisor";
+}
+
 function clearAuthAndRedirect() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -101,6 +110,12 @@ function clearAuthAndRedirect() {
 
 function logout() {
     clearAuthAndRedirect();
+}
+
+function protectUsersPageAccess() {
+    if (!canAccessUsersPage()) {
+        window.location.href = "/dashboard";
+    }
 }
 
 async function fetchWithAuth(url, options = {}) {
@@ -330,6 +345,7 @@ function closeConfirmStatusModal() {
 
 function applyRoleBasedUI() {
     const canAdminUsers = isUserAdminRole();
+    const isSupervisor = isSupervisorViewOnly();
 
     if (openCreateUserBtn) {
         openCreateUserBtn.classList.toggle("hidden", !canAdminUsers);
@@ -337,6 +353,12 @@ function applyRoleBasedUI() {
 
     if (openPasswordModalBtn) {
         openPasswordModalBtn.classList.toggle("hidden", !canAdminUsers);
+    }
+
+    if (isSupervisor) {
+        setStatus("View only mode");
+        setResultInfo("Supervisor can only view users and logs.");
+        return;
     }
 
     if (!canAdminUsers) {
@@ -654,8 +676,8 @@ function refreshUsersView() {
 // ============================================================
 
 async function loadUsers() {
-    if (!isUserAdminRole()) {
-        showUsersTableError("Only manager or HR can access user records.");
+    if (!canAccessUsersPage()) {
+        showUsersTableError("Access denied.");
         return;
     }
 
@@ -690,9 +712,9 @@ async function loadUsers() {
 }
 
 async function loadUserLogs(staffId = null) {
-    if (!isUserAdminRole()) {
+    if (!canAccessUsersPage()) {
         if (userLogsList) {
-            userLogsList.innerHTML = `<div class="empty-row">Only manager or HR can access user logs.</div>`;
+            userLogsList.innerHTML = `<div class="empty-row">Access denied.</div>`;
         }
         return;
     }
@@ -1268,6 +1290,8 @@ function bindEvents() {
 // ============================================================
 
 async function initUsersPage() {
+    protectUsersPageAccess();
+
     cacheDom();
     applyRoleBasedUI();
     bindEvents();
@@ -1279,10 +1303,10 @@ async function initUsersPage() {
     setStatus("Loading...");
     setResultInfo("Preparing users page...");
 
-    if (!isUserAdminRole()) {
-        showUsersTableError("Only manager or HR can access this page.");
+    if (!canAccessUsersPage()) {
+        showUsersTableError("Access denied.");
         if (userLogsList) {
-            userLogsList.innerHTML = `<div class="empty-row">Only manager or HR can access user logs.</div>`;
+            userLogsList.innerHTML = `<div class="empty-row">Access denied.</div>`;
         }
         setStatus("Access denied");
         setResultInfo("This page is restricted by role.");

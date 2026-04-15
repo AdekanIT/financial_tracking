@@ -10,6 +10,8 @@ FULL_FINANCIAL_ROLES = {"manager", "supervisor", "accounting"}
 LIMITED_FINANCIAL_OWN_ONLY_ROLES = {"dispatcher"}
 NO_FINANCIAL_ROLES = {"hr", "tracking"}
 
+ARCHIVE_ALLOWED_ROLES = {"manager", "supervisor", "accounting", "hr"}
+
 SENSITIVE_FIELDS = [
     "broker_price",
     "driver_pay",
@@ -17,6 +19,10 @@ SENSITIVE_FIELDS = [
     "percentage_of_margin",
     "dispatcher_commission_percent",
 ]
+
+
+def normalize_job_title(job_title: str) -> str:
+    return (job_title or "").strip().lower()
 
 
 def validate_company(company_id: int):
@@ -111,10 +117,6 @@ def check_reference_uniqueness(cursor, shipment_id: int, field_name: str, value:
         )
 
 
-def normalize_job_title(job_title: str) -> str:
-    return (job_title or "").strip().lower()
-
-
 def should_hide_financials_for_shipment(current_user: dict, shipment: dict) -> bool:
     job_title = normalize_job_title(current_user.get("job_title"))
     current_staff_id = current_user.get("staff_id")
@@ -166,7 +168,22 @@ def fetch_all_non_deleted_shipments(cursor):
     return cursor.fetchall()
 
 
-def create_shipment(data, staff_id):
+def ensure_archive_access(current_user: dict):
+    role = normalize_job_title(current_user.get("job_title"))
+    if role not in ARCHIVE_ALLOWED_ROLES:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def ensure_assigned_staff_change_allowed(current_user: dict):
+    role = normalize_job_title(current_user.get("job_title"))
+    if role != "manager":
+        raise HTTPException(
+            status_code=403,
+            detail="Only manager can change shipment owner"
+        )
+
+
+def create_shipment(data, staff_id, current_user=None):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -174,9 +191,18 @@ def create_shipment(data, staff_id):
         company_id = data["company_id"]
         validate_company(company_id)
 
+        requester_role = normalize_job_title((current_user or {}).get("job_title"))
+
         assigned_staff_id = data.get("assigned_staff_id", staff_id)
         if assigned_staff_id is None:
             assigned_staff_id = staff_id
+
+        if assigned_staff_id != staff_id and requester_role != "manager":
+            # create on behalf of another staff only for manager
+            raise HTTPException(
+                status_code=403,
+                detail="Only manager can assign shipment to another staff member on creation"
+            )
 
         staff = validate_staff(assigned_staff_id)
         staff_full_name = staff["staff_full_name"]
@@ -293,6 +319,7 @@ def get_my_shipments_service(current_user):
 
 
 def get_all_shipments_service(current_user):
+    ensure_archive_access(current_user)
     return get_visible_shipments_service(current_user)
 
 
@@ -396,12 +423,21 @@ def update_shipment_service(shipment_id, data, current_user):
         if not shipment:
             raise HTTPException(status_code=404, detail="Shipment not found")
 
-        if normalize_job_title(current_user["job_title"]) == "dispatcher":
+        current_role = normalize_job_title(current_user["job_title"])
+
+        if current_role == "dispatcher":
             if shipment["assigned_staff_id"] != current_user["staff_id"]:
                 raise HTTPException(status_code=403, detail="Access denied")
 
         if not data:
             raise HTTPException(status_code=400, detail="No fields provided")
+
+        if "assigned_staff_id" in data:
+            new_assigned_staff_id = data.get("assigned_staff_id")
+
+            # explicit owner change permission
+            if new_assigned_staff_id is not None and int(new_assigned_staff_id) != int(shipment["assigned_staff_id"]):
+                ensure_assigned_staff_change_allowed(current_user)
 
         if "company_id" in data and data["company_id"] is not None:
             validate_company(data["company_id"])

@@ -3,6 +3,8 @@ const API_BASE_URL = "http://127.0.0.1:8000";
 const TOKEN_KEY = "access_token";
 const USER_KEY = "user_data";
 
+const ARCHIVE_ALLOWED_ROLES = new Set(["manager", "supervisor", "hr", "accounting"]);
+
 let logoutBtn, toggleSidebarBtn, toggleArchiveNotesBtn;
 let runArchiveSearchBtn, resetArchiveFiltersBtn, refreshArchiveBtn;
 let archiveNotesPanel;
@@ -31,6 +33,15 @@ function getUserData() {
     } catch {
         return null;
     }
+}
+
+function getCurrentUserRole() {
+    const user = getUserData();
+    return String(user?.job_title || "").trim().toLowerCase();
+}
+
+function canAccessArchivePage() {
+    return ARCHIVE_ALLOWED_ROLES.has(getCurrentUserRole());
 }
 
 function clearAuthAndRedirect() {
@@ -77,6 +88,29 @@ async function fetchWithAuth(url, options = {}) {
     }
 
     return response;
+}
+
+// ============================================================
+// SIDEBAR ROLE VISIBILITY
+// ============================================================
+
+function setSidebarLinkVisibility(href, allowedRoles) {
+    const role = getCurrentUserRole();
+
+    document.querySelectorAll(`a.nav-link[href="${href}"]`).forEach((el) => {
+        el.style.display = allowedRoles.includes(role) ? "" : "none";
+    });
+}
+
+function applySidebarRoleVisibility() {
+    setSidebarLinkVisibility("/users", ["manager"]);
+    setSidebarLinkVisibility("/archive", ["manager", "supervisor", "hr", "accounting"]);
+}
+
+function protectArchivePageAccess() {
+    if (!canAccessArchivePage()) {
+        window.location.href = "/dashboard";
+    }
 }
 
 // ============================================================
@@ -471,6 +505,13 @@ function applyArchiveFiltersFrontend(rows) {
 // ============================================================
 
 async function performArchiveSearch() {
+    if (!canAccessArchivePage()) {
+        showArchiveTableError("Access denied.");
+        setStatus("Access denied");
+        setResultInfo("You do not have permission to view archive.");
+        return;
+    }
+
     showArchiveTableLoading("Loading full shipment archive...");
     setStatus("Loading archive...");
     setResultInfo("Searching shipment archive...");
@@ -612,7 +653,10 @@ function bindEvents() {
 // ============================================================
 
 async function initArchivePage() {
+    protectArchivePageAccess();
+
     cacheDom();
+    applySidebarRoleVisibility();
     bindEvents();
     bindSorting();
 

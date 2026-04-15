@@ -221,26 +221,8 @@
             transform: translateY(-1px);
         }
 
-        .danger-btn {
-            border: 1px solid rgba(239, 68, 68, 0.30);
-            border-radius: 10px;
-            padding: 10px 14px;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            color: #fee2e2;
-            background: rgba(127, 29, 29, 0.35);
-            transition: 0.2s ease;
-        }
-
-        .danger-btn:hover {
-            background: rgba(153, 27, 27, 0.48);
-        }
-
         .compact-input,
-        .compact-select,
         .salary-form input,
-        .salary-form select,
         .salary-form textarea {
             padding: 9px 11px;
             border-radius: 10px;
@@ -254,9 +236,7 @@
         }
 
         .compact-input:focus,
-        .compact-select:focus,
         .salary-form input:focus,
-        .salary-form select:focus,
         .salary-form textarea:focus {
             border-color: #60a5fa;
             box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
@@ -988,7 +968,7 @@
                     <div class="notes-list">
                         <div class="notes-item">Salary Check is for preview only and does not generate records.</div>
                         <div class="notes-item">Generate Salary creates official salary records for the selected employee and period.</div>
-                        <div class="notes-item">Dispatchers should only see their own salary data for the selected date range.</div>
+                        <div class="notes-item">Dispatchers, HR, and supervisors should only see their own salary data for the selected date range.</div>
                         <div class="notes-item">Export functions are intended only for manager or accounting roles.</div>
                     </div>
                 </div>
@@ -1089,7 +1069,7 @@
 
                         <div class="salary-field">
                             <label for="staffFullName">Staff Full Name</label>
-                            <input type="text" id="staffFullName" placeholder="Type full name of the staff">
+                            <input type="text" id="staffFullName" placeholder="Enter full name">
                         </div>
 
                         <div class="salary-field">
@@ -1118,59 +1098,6 @@
                         <button type="button" id="previewGenerateSalaryBtn" class="small-btn">Salary Preview</button>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
-
-    <div id="dispatcherSalaryCheckCard" class="control-card hidden">
-        <div class="salary-control-header">
-            <button id="toggleDispatcherSalaryCheckPanelBtn" class="primary-blue-btn" type="button">My Salary Check</button>
-        </div>
-
-        <div id="dispatcherSalaryCheckPanel" class="animated-panel open">
-            <div class="panel-inner">
-                <div class="panel-title">My Salary Check</div>
-                <div class="panel-subtitle">
-                    Check only your own salary result for the selected period.
-                </div>
-
-                <div class="filter-grid">
-                    <div class="filter-field">
-                        <label for="dispatcherStartDate">Start Date</label>
-                        <div class="input-with-picker">
-                            <input id="dispatcherStartDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
-                            <button id="dispatcherStartDatePickerBtn" class="picker-launch-btn" type="button" title="Pick start date">
-                                <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="filter-field">
-                        <label for="dispatcherEndDate">End Date</label>
-                        <div class="input-with-picker">
-                            <input id="dispatcherEndDate" class="compact-input" type="text" placeholder="dd/mm/yyyy" autocomplete="off">
-                            <button id="dispatcherEndDatePickerBtn" class="picker-launch-btn" type="button" title="Pick end date">
-                                <svg class="icon-svg"><use href="#icon-calendar"></use></svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="filter-field">
-                        <label for="dispatcherResultModeDisplay">Result Type</label>
-                        <div class="custom-trigger">
-                            <input id="dispatcherResultModeDisplay" class="compact-input custom-trigger-input" type="text" readonly value="My Preview">
-                            <input id="dispatcherResultMode" type="hidden" value="preview_my">
-                            <span class="custom-trigger-icon" aria-hidden="true">
-                                <svg class="icon-svg"><use href="#icon-chevron-down"></use></svg>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="salary-actions-row">
-                    <button type="button" id="dispatcherRunBtn" class="primary-blue-btn">Check My Salary</button>
-                    <button type="button" id="dispatcherResetBtn" class="small-btn">Reset</button>
-                </div>
             </div>
         </div>
     </div>

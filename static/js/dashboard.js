@@ -125,6 +125,19 @@ function getCurrentRole() {
     return String(user?.job_title || "").toLowerCase();
 }
 
+function setSidebarLinkVisibility(href, allowedRoles, getRoleFn) {
+    const role = getRoleFn();
+
+    document.querySelectorAll(`a.nav-link[href="${href}"]`).forEach((el) => {
+        el.style.display = allowedRoles.includes(role) ? "" : "none";
+    });
+}
+
+function applySidebarRoleVisibility() {
+    setSidebarLinkVisibility("/users", ["manager"], getCurrentRole);
+    setSidebarLinkVisibility("/archive", ["manager", "supervisor", "hr", "accounting"], getCurrentRole);
+}
+
 function setDashboardLabels() {
     const role = getCurrentRole();
 
@@ -1042,6 +1055,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setUserName();
     setDashboardLabels();
+    applySidebarRoleVisibility();
     applyNotesVisibility();
     initChartTabs();
     initPeriodTabs();
