@@ -473,10 +473,9 @@ function setSidebarLinkVisibility(href, allowedRoles) {
 }
 
 function applySidebarRoleVisibility() {
-    setSidebarLinkVisibility("/users", ["manager"]);
+    setSidebarLinkVisibility("/users", ["manager", "hr"]);
     setSidebarLinkVisibility("/archive", ["manager", "supervisor", "hr", "accounting"]);
 }
-
 
 function applyRoleBasedUI() {
     const fullRole = isFullSalaryRole();
@@ -1149,6 +1148,8 @@ async function downloadExcel() {
 function resetSalaryFilters() {
     if (salaryStartDateInput) salaryStartDateInput.value = "";
     if (salaryEndDateInput) salaryEndDateInput.value = "";
+    if (generateStartDateInput) generateStartDateInput.value = "";
+    if (generateEndDateInput) generateEndDateInput.value = "";
 
     const defaultValue = isFullSalaryRole() ? "preview_all" : "preview_my";
     setSelectValue("salaryViewMode", defaultValue);
@@ -1175,6 +1176,135 @@ function bindSortHandlers() {
             renderSalaryTable(currentSalaryRows, currentTableMode);
         });
     });
+}
+
+/* =========================
+   CUSTOM DATE PICKER
+========================= */
+
+function getInputById(id) {
+    if (!id) return null;
+    return document.getElementById(id);
+}
+
+function openDatePicker(inputId, title = "Select Date") {
+    const input = getInputById(inputId);
+    if (!input || !datePickerModal) return;
+
+    datePickerTargetInputId = inputId;
+
+    if (dateModalTitle) {
+        dateModalTitle.textContent = title;
+    }
+
+    const parsed = parseSlashDate(input.value);
+    datePickerViewDate = parsed || new Date();
+
+    renderDatePicker();
+    datePickerModal.style.display = "flex";
+    datePickerModal.classList.remove("hidden");
+}
+
+function closeDatePicker() {
+    datePickerTargetInputId = null;
+    if (!datePickerModal) return;
+
+    datePickerModal.style.display = "none";
+    datePickerModal.classList.add("hidden");
+}
+
+function selectDateFromPicker(date) {
+    const input = getInputById(datePickerTargetInputId);
+    if (!input) return;
+
+    input.value = formatDateToSlash(date);
+    input.classList.remove("field-error");
+    closeDatePicker();
+}
+
+function clearDatePickerValue() {
+    const input = getInputById(datePickerTargetInputId);
+    if (input) {
+        input.value = "";
+        input.classList.remove("field-error");
+    }
+    closeDatePicker();
+}
+
+function renderDatePicker() {
+    if (!dateGrid || !dateCurrentMonthLabel) return;
+
+    const year = datePickerViewDate.getFullYear();
+    const month = datePickerViewDate.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    let firstWeekday = firstDay.getDay();
+    firstWeekday = firstWeekday === 0 ? 7 : firstWeekday; // Monday start
+
+    const daysInMonth = lastDay.getDate();
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+
+    dateCurrentMonthLabel.textContent = datePickerViewDate.toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric"
+    });
+
+    dateGrid.innerHTML = "";
+
+    const targetInput = getInputById(datePickerTargetInputId);
+    const selectedDate = targetInput ? parseSlashDate(targetInput.value) : null;
+
+    for (let i = firstWeekday - 1; i > 0; i--) {
+        const day = prevMonthLastDay - i + 1;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "date-day-btn muted";
+        btn.textContent = String(day);
+
+        const mutedDate = new Date(year, month - 1, day);
+        btn.addEventListener("click", () => selectDateFromPicker(mutedDate));
+
+        dateGrid.appendChild(btn);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "date-day-btn";
+        btn.textContent = String(day);
+
+        const currentDate = new Date(year, month, day);
+
+        if (
+            selectedDate &&
+            currentDate.getFullYear() === selectedDate.getFullYear() &&
+            currentDate.getMonth() === selectedDate.getMonth() &&
+            currentDate.getDate() === selectedDate.getDate()
+        ) {
+            btn.classList.add("active");
+        }
+
+        btn.addEventListener("click", () => selectDateFromPicker(currentDate));
+        dateGrid.appendChild(btn);
+    }
+
+    const totalCells = dateGrid.children.length;
+    const remainder = totalCells % 7;
+    const extraCells = remainder === 0 ? 0 : 7 - remainder;
+
+    for (let day = 1; day <= extraCells; day++) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "date-day-btn muted";
+        btn.textContent = String(day);
+
+        const mutedDate = new Date(year, month + 1, day);
+        btn.addEventListener("click", () => selectDateFromPicker(mutedDate));
+
+        dateGrid.appendChild(btn);
+    }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1256,6 +1386,49 @@ document.addEventListener("DOMContentLoaded", () => {
         generateStartDateInput,
         generateEndDateInput
     ].forEach(normalizeDateTyping);
+
+    salaryStartDatePickerBtn?.addEventListener("click", () => {
+        openDatePicker("salaryStartDate", "Select Start Date");
+    });
+
+    salaryEndDatePickerBtn?.addEventListener("click", () => {
+        openDatePicker("salaryEndDate", "Select End Date");
+    });
+
+    generateStartDatePickerBtn?.addEventListener("click", () => {
+        openDatePicker("generateStartDate", "Select Start Date");
+    });
+
+    generateEndDatePickerBtn?.addEventListener("click", () => {
+        openDatePicker("generateEndDate", "Select End Date");
+    });
+
+    datePrevMonthBtn?.addEventListener("click", () => {
+        datePickerViewDate = new Date(
+            datePickerViewDate.getFullYear(),
+            datePickerViewDate.getMonth() - 1,
+            1
+        );
+        renderDatePicker();
+    });
+
+    dateNextMonthBtn?.addEventListener("click", () => {
+        datePickerViewDate = new Date(
+            datePickerViewDate.getFullYear(),
+            datePickerViewDate.getMonth() + 1,
+            1
+        );
+        renderDatePicker();
+    });
+
+    dateCloseBtn?.addEventListener("click", closeDatePicker);
+    dateClearBtn?.addEventListener("click", clearDatePickerValue);
+
+    datePickerModal?.addEventListener("click", (e) => {
+        if (e.target === datePickerModal) {
+            closeDatePicker();
+        }
+    });
 
     logoutBtn?.addEventListener("click", logout);
     toggleSidebarBtn?.addEventListener("click", toggleSidebar);

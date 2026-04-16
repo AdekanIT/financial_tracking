@@ -10,7 +10,7 @@ let runArchiveSearchBtn, resetArchiveFiltersBtn, refreshArchiveBtn;
 let archiveNotesPanel;
 
 let archiveTableBody, archiveResultInfo, archiveStatusText;
-let summaryTotalResults, summaryTotalBrokerPrice, summaryTotalDriverPay, summaryTotalProfit;
+let summaryTotalResults;
 
 let searchInput, referenceInput, brokerReferenceInput, brokerInput, createdDateInput;
 
@@ -103,7 +103,7 @@ function setSidebarLinkVisibility(href, allowedRoles) {
 }
 
 function applySidebarRoleVisibility() {
-    setSidebarLinkVisibility("/users", ["manager"]);
+    setSidebarLinkVisibility("/users", ["manager", "hr"]);
     setSidebarLinkVisibility("/archive", ["manager", "supervisor", "hr", "accounting"]);
 }
 
@@ -381,14 +381,7 @@ function setSortIndicators() {
 
 function updateSummaryCards(rows) {
     const totalResults = rows.length;
-    const totalBrokerPrice = rows.reduce((sum, row) => sum + Number(row.broker_price || 0), 0);
-    const totalDriverPay = rows.reduce((sum, row) => sum + Number(row.driver_pay || 0), 0);
-    const totalProfit = rows.reduce((sum, row) => sum + Number(row.profit || 0), 0);
-
     if (summaryTotalResults) summaryTotalResults.textContent = String(totalResults);
-    if (summaryTotalBrokerPrice) summaryTotalBrokerPrice.textContent = formatCurrency(totalBrokerPrice);
-    if (summaryTotalDriverPay) summaryTotalDriverPay.textContent = formatCurrency(totalDriverPay);
-    if (summaryTotalProfit) summaryTotalProfit.textContent = formatCurrency(totalProfit);
 }
 
 function renderArchiveTable(rows) {
@@ -612,9 +605,6 @@ function cacheDom() {
     archiveStatusText = document.getElementById("archiveStatusText");
 
     summaryTotalResults = document.getElementById("summaryTotalResults");
-    summaryTotalBrokerPrice = document.getElementById("summaryTotalBrokerPrice");
-    summaryTotalDriverPay = document.getElementById("summaryTotalDriverPay");
-    summaryTotalProfit = document.getElementById("summaryTotalProfit");
 
     searchInput = document.getElementById("archiveSearchInput");
     referenceInput = document.getElementById("archiveReferenceInput");

@@ -68,6 +68,27 @@ let allShipments = [];
 let filteredShipments = [];
 let managerStaffList = [];
 
+/* =========================
+   DATE / MONTH / TIME MODALS
+========================= */
+let datePickerModal, datePrevMonthBtn, dateNextMonthBtn, dateGrid, dateCurrentMonthLabel, dateCloseBtn, dateClearBtn, dateModalTitle;
+let monthPickerModal, monthPrevYearBtn, monthNextYearBtn, monthGrid, monthCurrentYearLabel, monthClearBtn, monthCloseBtn;
+let timePickerModal, timeModalTitle, timeHourUpBtn, timeHourDownBtn, timeMinuteUpBtn, timeMinuteDownBtn;
+let timeHourDisplay, timeMinuteDisplay, timeAmPmToggle, timeAmBtn, timePmBtn, timePreviewBox, timeClearBtn, timeCloseBtn, timeApplyBtn;
+let timeFormatModal, formatCloseBtn, formatOptionButtons;
+
+let activeDateInputId = null;
+let currentDateView = new Date();
+
+let activeMonthInputId = null;
+let currentMonthViewYear = new Date().getFullYear();
+
+let activeTimeInputId = null;
+let timePickerState = {
+    hour24: 0,
+    minute: 0
+};
+
 const STATE_OPTIONS = [
     "AL - Alabama", "AK - Alaska", "AZ - Arizona", "AR - Arkansas", "CA - California",
     "CO - Colorado", "CT - Connecticut", "DE - Delaware", "FL - Florida", "GA - Georgia",
@@ -235,12 +256,6 @@ function getShipmentsEndpoint() {
     return `${API_BASE_URL}/shipments/visible`;
 }
 
-function hideSidebarLinkByHref(href) {
-    document.querySelectorAll(`a.nav-link[href="${href}"]`).forEach((el) => {
-        el.style.display = "none";
-    });
-}
-
 function setSidebarLinkVisibility(href, allowedRoles) {
     const role = getCurrentUserRole();
 
@@ -250,7 +265,7 @@ function setSidebarLinkVisibility(href, allowedRoles) {
 }
 
 function applySidebarRoleVisibility() {
-    setSidebarLinkVisibility("/users", ["manager"]);
+    setSidebarLinkVisibility("/users", ["manager", "hr"]);
     setSidebarLinkVisibility("/archive", ["manager", "supervisor", "hr", "accounting"]);
 }
 
@@ -272,6 +287,11 @@ function syncTimeFormatUI() {
 
     if (timeFormatSelect) timeFormatSelect.value = format;
     if (timeFormatDisplay) timeFormatDisplay.value = getTimeFormatLabel(format);
+    if (formatOptionButtons?.length) {
+        formatOptionButtons.forEach(btn => {
+            btn.classList.toggle("active", btn.dataset.formatValue === format);
+        });
+    }
 }
 
 function formatCurrencyOrDash(value) {
@@ -577,6 +597,7 @@ function refreshTimeDisplaysForFormatChange() {
             setTimeInputValue(id, value);
         }
     });
+    updateTimePreview();
 }
 
 function handleManualTimeInput(inputId) {
@@ -1504,11 +1525,6 @@ function setBrokerPaymentOptionValue(value) {
     if (display) display.value = item.label;
 }
 
-function getStaffDisplayName(staff) {
-    if (!staff) return "";
-    return `${staff.staff_full_name} (${staff.job_title})`;
-}
-
 function setAssignedStaffValue(staffId) {
     const hiddenInput = document.getElementById("assigned_staff_id");
     const displayInput = document.getElementById("assigned_staff_id_display");
@@ -1983,6 +1999,323 @@ function bindFilterEvents() {
     }
 }
 
+/* =========================
+   CUSTOM DATE PICKER
+========================= */
+function getDateInputById(id) {
+    return document.getElementById(id);
+}
+
+function openDatePicker(inputId, title = "Select Date") {
+    const input = getDateInputById(inputId);
+    if (!input || !datePickerModal) return;
+
+    activeDateInputId = inputId;
+    if (dateModalTitle) dateModalTitle.textContent = title;
+
+    const parsed = parseSlashDate(input.value);
+    currentDateView = parsed || new Date();
+
+    renderDatePicker();
+    datePickerModal.style.display = "flex";
+}
+
+function closeDatePicker() {
+    activeDateInputId = null;
+    if (datePickerModal) datePickerModal.style.display = "none";
+}
+
+function selectDateFromPicker(date) {
+    const input = getDateInputById(activeDateInputId);
+    if (!input) return;
+
+    input.value = formatDateToSlash(date);
+    input.classList.remove("field-error");
+    closeDatePicker();
+
+    if (input === filterCreatedDate) {
+        refreshFilteredView();
+    }
+}
+
+function clearDateFromPicker() {
+    const input = getDateInputById(activeDateInputId);
+    if (input) {
+        input.value = "";
+        input.classList.remove("field-error");
+        if (input === filterCreatedDate) {
+            refreshFilteredView();
+        }
+    }
+    closeDatePicker();
+}
+
+function renderDatePicker() {
+    if (!dateGrid || !dateCurrentMonthLabel) return;
+
+    const year = currentDateView.getFullYear();
+    const month = currentDateView.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    let firstWeekday = firstDay.getDay();
+    firstWeekday = firstWeekday === 0 ? 7 : firstWeekday;
+
+    const daysInMonth = lastDay.getDate();
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+
+    dateCurrentMonthLabel.textContent = currentDateView.toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric"
+    });
+
+    dateGrid.innerHTML = "";
+
+    const targetInput = getDateInputById(activeDateInputId);
+    const selectedDate = targetInput ? parseSlashDate(targetInput.value) : null;
+
+    for (let i = firstWeekday - 1; i > 0; i--) {
+        const day = prevMonthLastDay - i + 1;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "date-day-btn muted";
+        btn.textContent = String(day);
+        const mutedDate = new Date(year, month - 1, day);
+        btn.addEventListener("click", () => selectDateFromPicker(mutedDate));
+        dateGrid.appendChild(btn);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "date-day-btn";
+        btn.textContent = String(day);
+
+        const currentDate = new Date(year, month, day);
+
+        if (
+            selectedDate &&
+            currentDate.getFullYear() === selectedDate.getFullYear() &&
+            currentDate.getMonth() === selectedDate.getMonth() &&
+            currentDate.getDate() === selectedDate.getDate()
+        ) {
+            btn.classList.add("active");
+        }
+
+        btn.addEventListener("click", () => selectDateFromPicker(currentDate));
+        dateGrid.appendChild(btn);
+    }
+
+    const totalCells = dateGrid.children.length;
+    const remainder = totalCells % 7;
+    const extraCells = remainder === 0 ? 0 : 7 - remainder;
+
+    for (let day = 1; day <= extraCells; day++) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "date-day-btn muted";
+        btn.textContent = String(day);
+        const mutedDate = new Date(year, month + 1, day);
+        btn.addEventListener("click", () => selectDateFromPicker(mutedDate));
+        dateGrid.appendChild(btn);
+    }
+}
+
+/* =========================
+   CUSTOM MONTH PICKER
+========================= */
+function openMonthPicker(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input || !monthPickerModal) return;
+
+    activeMonthInputId = inputId;
+    const parsed = parseMonthDisplay(input.value);
+    currentMonthViewYear = parsed?.year || new Date().getFullYear();
+
+    renderMonthPicker();
+    monthPickerModal.style.display = "flex";
+}
+
+function closeMonthPicker() {
+    activeMonthInputId = null;
+    if (monthPickerModal) monthPickerModal.style.display = "none";
+}
+
+function selectMonthFromPicker(year, monthIndex) {
+    const input = document.getElementById(activeMonthInputId);
+    if (!input) return;
+
+    input.value = formatMonthValue(year, monthIndex);
+    closeMonthPicker();
+    if (input === filterMonth) {
+        refreshFilteredView();
+    }
+}
+
+function clearMonthFromPicker() {
+    const input = document.getElementById(activeMonthInputId);
+    if (input) {
+        input.value = "";
+        if (input === filterMonth) {
+            refreshFilteredView();
+        }
+    }
+    closeMonthPicker();
+}
+
+function renderMonthPicker() {
+    if (!monthGrid || !monthCurrentYearLabel) return;
+
+    monthCurrentYearLabel.textContent = String(currentMonthViewYear);
+    monthGrid.innerHTML = "";
+
+    const input = document.getElementById(activeMonthInputId);
+    const selected = parseMonthDisplay(input?.value || "");
+
+    MONTH_NAMES_SHORT.forEach((label, index) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "month-btn";
+        btn.textContent = label;
+
+        if (selected && selected.year === currentMonthViewYear && selected.monthIndex === index) {
+            btn.classList.add("active");
+        }
+
+        btn.addEventListener("click", () => selectMonthFromPicker(currentMonthViewYear, index));
+        monthGrid.appendChild(btn);
+    });
+}
+
+/* =========================
+   CUSTOM TIME PICKER
+========================= */
+function setTimePickerStateFromValue(rawValue) {
+    const normalized = normalizeTimeInputValue(rawValue) || "08:00";
+    const [hh, mm] = normalized.split(":");
+    timePickerState.hour24 = Number(hh);
+    timePickerState.minute = Number(mm);
+}
+
+function updateTimePreview() {
+    if (!timeHourDisplay || !timeMinuteDisplay || !timePreviewBox || !timeAmBtn || !timePmBtn) return;
+
+    const hour24 = Number(timePickerState.hour24 || 0);
+    const minute = Number(timePickerState.minute || 0);
+    const format = getTimeFormat();
+
+    if (format === "24") {
+        timeHourDisplay.textContent = String(hour24).padStart(2, "0");
+        timeMinuteDisplay.textContent = String(minute).padStart(2, "0");
+        timePreviewBox.textContent = `${String(hour24).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+        if (timeAmPmToggle) timeAmPmToggle.style.display = "none";
+        return;
+    }
+
+    let hour12 = hour24 % 12;
+    if (hour12 === 0) hour12 = 12;
+    const isPm = hour24 >= 12;
+
+    timeHourDisplay.textContent = String(hour12).padStart(2, "0");
+    timeMinuteDisplay.textContent = String(minute).padStart(2, "0");
+    timePreviewBox.textContent = `${hour12}:${String(minute).padStart(2, "0")} ${isPm ? "PM" : "AM"}`;
+    if (timeAmPmToggle) timeAmPmToggle.style.display = "grid";
+    timeAmBtn.classList.toggle("active", !isPm);
+    timePmBtn.classList.toggle("active", isPm);
+}
+
+function openTimePicker(inputId, title = "Select Time") {
+    const input = document.getElementById(inputId);
+    if (!input || !timePickerModal) return;
+
+    activeTimeInputId = inputId;
+    if (timeModalTitle) timeModalTitle.textContent = title;
+
+    setTimePickerStateFromValue(getTimeInputValue(inputId) || input.value);
+    updateTimePreview();
+
+    timePickerModal.style.display = "flex";
+}
+
+function closeTimePicker() {
+    activeTimeInputId = null;
+    if (timePickerModal) timePickerModal.style.display = "none";
+}
+
+function applyTimePicker() {
+    if (!activeTimeInputId) return;
+
+    const normalized = `${String(timePickerState.hour24).padStart(2, "0")}:${String(timePickerState.minute).padStart(2, "0")}`;
+    setTimeInputValue(activeTimeInputId, normalized);
+    closeTimePicker();
+}
+
+function clearTimePicker() {
+    if (!activeTimeInputId) return;
+    setTimeInputValue(activeTimeInputId, "");
+    closeTimePicker();
+}
+
+function stepHour(delta) {
+    const format = getTimeFormat();
+
+    if (format === "24") {
+        timePickerState.hour24 = (timePickerState.hour24 + delta + 24) % 24;
+        updateTimePreview();
+        return;
+    }
+
+    let hour12 = timePickerState.hour24 % 12;
+    if (hour12 === 0) hour12 = 12;
+    const isPm = timePickerState.hour24 >= 12;
+
+    hour12 += delta;
+    if (hour12 < 1) hour12 = 12;
+    if (hour12 > 12) hour12 = 1;
+
+    let nextHour24 = hour12 % 12;
+    if (isPm) nextHour24 += 12;
+    timePickerState.hour24 = nextHour24;
+    updateTimePreview();
+}
+
+function stepMinute(delta) {
+    let minute = Number(timePickerState.minute || 0);
+    minute += delta;
+
+    if (minute < 0) minute = 55;
+    if (minute > 55) minute = 0;
+
+    timePickerState.minute = minute;
+    updateTimePreview();
+}
+
+function setAmPm(isPm) {
+    const hour24 = Number(timePickerState.hour24 || 0);
+    let hour12 = hour24 % 12;
+    if (hour12 === 0) hour12 = 12;
+
+    let nextHour24 = hour12 % 12;
+    if (isPm) nextHour24 += 12;
+    timePickerState.hour24 = nextHour24;
+    updateTimePreview();
+}
+
+/* =========================
+   CUSTOM TIME FORMAT MODAL
+========================= */
+function openTimeFormatModal() {
+    if (!timeFormatModal) return;
+    syncTimeFormatUI();
+    timeFormatModal.style.display = "flex";
+}
+
+function closeTimeFormatModal() {
+    if (!timeFormatModal) return;
+    timeFormatModal.style.display = "none";
+}
+
 function bindDateAndTimeInputs() {
     [
         document.getElementById("shipment_created_date"),
@@ -1990,50 +2323,116 @@ function bindDateAndTimeInputs() {
         document.getElementById("delivery_date")
     ].forEach(el => normalizeDateTyping(el));
 
+    if (filterCreatedDate) {
+        normalizeDateTyping(filterCreatedDate, refreshFilteredView);
+    }
+
     ["pickup_time", "delivery_time"].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
 
         el.addEventListener("blur", () => {
-            handleManualTimeInput(id);
+            if (el.value.trim()) {
+                handleManualTimeInput(id);
+            } else {
+                el.dataset.timeValue = "";
+                el.classList.remove("field-error");
+            }
         });
 
         el.addEventListener("dblclick", () => {
-            const current = getTimeInputValue(id) || "08:00";
-            const typed = prompt("Enter time in HH:MM or H:MM AM/PM", formatTimeForDisplay(current));
-            if (typed !== null) {
-                const normalized = normalizeTimeInputValue(typed);
-                if (normalized) {
-                    setTimeInputValue(id, normalized);
-                } else {
-                    el.classList.add("field-error");
-                }
-            }
+            openTimePicker(id, id === "pickup_time" ? "Select Pickup Time" : "Select Delivery Time");
         });
     });
 
-    [
-        ["shipmentCreatedDatePickerBtn", "shipment_created_date"],
-        ["pickupDatePickerBtn", "pickup_date"],
-        ["deliveryDatePickerBtn", "delivery_date"],
-        ["filterCreatedDatePickerBtn", "filterCreatedDate"]
-    ].forEach(([btnId, inputId]) => {
-        const btn = document.getElementById(btnId);
-        const input = document.getElementById(inputId);
-        if (!btn || !input) return;
-
-        btn.addEventListener("click", () => {
-            input.focus();
-        });
+    shipmentCreatedDatePickerBtn?.addEventListener("click", () => {
+        openDatePicker("shipment_created_date", "Select Created Date");
     });
 
-    if (filterMonthPickerBtn && filterMonth) {
-        filterMonthPickerBtn.addEventListener("click", () => {
-            const typed = prompt("Enter month as Mon YYYY", filterMonth.value || formatMonthValue(new Date().getFullYear(), new Date().getMonth()));
-            if (typed !== null) {
-                filterMonth.value = typed;
-                refreshFilteredView();
-            }
+    pickupDatePickerBtn?.addEventListener("click", () => {
+        openDatePicker("pickup_date", "Select Pickup Date");
+    });
+
+    deliveryDatePickerBtn?.addEventListener("click", () => {
+        openDatePicker("delivery_date", "Select Delivery Date");
+    });
+
+    filterCreatedDatePickerBtn?.addEventListener("click", () => {
+        openDatePicker("filterCreatedDate", "Select Created Date");
+    });
+
+    filterMonthPickerBtn?.addEventListener("click", () => {
+        openMonthPicker("filterMonth");
+    });
+}
+
+function initDateMonthTimeModals() {
+    datePrevMonthBtn?.addEventListener("click", () => {
+        currentDateView = new Date(currentDateView.getFullYear(), currentDateView.getMonth() - 1, 1);
+        renderDatePicker();
+    });
+
+    dateNextMonthBtn?.addEventListener("click", () => {
+        currentDateView = new Date(currentDateView.getFullYear(), currentDateView.getMonth() + 1, 1);
+        renderDatePicker();
+    });
+
+    dateCloseBtn?.addEventListener("click", closeDatePicker);
+    dateClearBtn?.addEventListener("click", clearDateFromPicker);
+
+    datePickerModal?.addEventListener("click", (e) => {
+        if (e.target === datePickerModal) closeDatePicker();
+    });
+
+    monthPrevYearBtn?.addEventListener("click", () => {
+        currentMonthViewYear -= 1;
+        renderMonthPicker();
+    });
+
+    monthNextYearBtn?.addEventListener("click", () => {
+        currentMonthViewYear += 1;
+        renderMonthPicker();
+    });
+
+    monthCloseBtn?.addEventListener("click", closeMonthPicker);
+    monthClearBtn?.addEventListener("click", clearMonthFromPicker);
+
+    monthPickerModal?.addEventListener("click", (e) => {
+        if (e.target === monthPickerModal) closeMonthPicker();
+    });
+
+    timeHourUpBtn?.addEventListener("click", () => stepHour(1));
+    timeHourDownBtn?.addEventListener("click", () => stepHour(-1));
+    timeMinuteUpBtn?.addEventListener("click", () => stepMinute(5));
+    timeMinuteDownBtn?.addEventListener("click", () => stepMinute(-5));
+
+    timeAmBtn?.addEventListener("click", () => setAmPm(false));
+    timePmBtn?.addEventListener("click", () => setAmPm(true));
+
+    timeApplyBtn?.addEventListener("click", applyTimePicker);
+    timeClearBtn?.addEventListener("click", clearTimePicker);
+    timeCloseBtn?.addEventListener("click", closeTimePicker);
+
+    timePickerModal?.addEventListener("click", (e) => {
+        if (e.target === timePickerModal) closeTimePicker();
+    });
+
+    timeFormatDisplay?.addEventListener("click", openTimeFormatModal);
+    formatCloseBtn?.addEventListener("click", closeTimeFormatModal);
+
+    timeFormatModal?.addEventListener("click", (e) => {
+        if (e.target === timeFormatModal) closeTimeFormatModal();
+    });
+
+    if (formatOptionButtons?.length) {
+        formatOptionButtons.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const value = btn.dataset.formatValue;
+                if (!value) return;
+                setTimeFormat(value);
+                refreshTimeDisplaysForFormatChange();
+                closeTimeFormatModal();
+            });
         });
     }
 }
@@ -2096,6 +2495,43 @@ document.addEventListener("DOMContentLoaded", async () => {
     customSelectList = document.getElementById("customSelectList");
     customSelectCloseBtn = document.getElementById("customSelectCloseBtn");
 
+    datePickerModal = document.getElementById("datePickerModal");
+    datePrevMonthBtn = document.getElementById("datePrevMonthBtn");
+    dateNextMonthBtn = document.getElementById("dateNextMonthBtn");
+    dateGrid = document.getElementById("dateGrid");
+    dateCurrentMonthLabel = document.getElementById("dateCurrentMonthLabel");
+    dateCloseBtn = document.getElementById("dateCloseBtn");
+    dateClearBtn = document.getElementById("dateClearBtn");
+    dateModalTitle = document.getElementById("dateModalTitle");
+
+    monthPickerModal = document.getElementById("monthPickerModal");
+    monthPrevYearBtn = document.getElementById("monthPrevYearBtn");
+    monthNextYearBtn = document.getElementById("monthNextYearBtn");
+    monthGrid = document.getElementById("monthGrid");
+    monthCurrentYearLabel = document.getElementById("monthCurrentYearLabel");
+    monthClearBtn = document.getElementById("monthClearBtn");
+    monthCloseBtn = document.getElementById("monthCloseBtn");
+
+    timePickerModal = document.getElementById("timePickerModal");
+    timeModalTitle = document.getElementById("timeModalTitle");
+    timeHourUpBtn = document.getElementById("timeHourUpBtn");
+    timeHourDownBtn = document.getElementById("timeHourDownBtn");
+    timeMinuteUpBtn = document.getElementById("timeMinuteUpBtn");
+    timeMinuteDownBtn = document.getElementById("timeMinuteDownBtn");
+    timeHourDisplay = document.getElementById("timeHourDisplay");
+    timeMinuteDisplay = document.getElementById("timeMinuteDisplay");
+    timeAmPmToggle = document.getElementById("timeAmPmToggle");
+    timeAmBtn = document.getElementById("timeAmBtn");
+    timePmBtn = document.getElementById("timePmBtn");
+    timePreviewBox = document.getElementById("timePreviewBox");
+    timeClearBtn = document.getElementById("timeClearBtn");
+    timeCloseBtn = document.getElementById("timeCloseBtn");
+    timeApplyBtn = document.getElementById("timeApplyBtn");
+
+    timeFormatModal = document.getElementById("timeFormatModal");
+    formatCloseBtn = document.getElementById("formatCloseBtn");
+    formatOptionButtons = Array.from(document.querySelectorAll(".format-option-btn"));
+
     applySidebarRoleVisibility();
     syncTimeFormatUI();
     renderHeader();
@@ -2105,6 +2541,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setDefaultMonthFilter();
     bindFilterEvents();
     bindDateAndTimeInputs();
+    initDateMonthTimeModals();
     renderBrokerNameSuggestions();
 
     try {
@@ -2147,13 +2584,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     cancelDeleteShipmentBtn?.addEventListener("click", closeDeleteShipmentModal);
     confirmDeleteShipmentBtn?.addEventListener("click", executeDeleteShipment);
-
-    timeFormatDisplay?.addEventListener("click", () => {
-        const current = getTimeFormat();
-        const next = current === "12" ? "24" : "12";
-        setTimeFormat(next);
-        refreshTimeDisplaysForFormatChange();
-    });
 
     document.getElementById("assigned_staff_id_display")?.addEventListener("click", openAssignedStaffPicker);
     document.getElementById("edit_payment_status_display")?.addEventListener("click", openDriverPaymentStatusPicker);

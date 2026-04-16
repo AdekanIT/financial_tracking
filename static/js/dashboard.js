@@ -144,7 +144,7 @@ function setSidebarLinkVisibility(href, allowedRoles, getRoleFn) {
 }
 
 function applySidebarRoleVisibility() {
-    setSidebarLinkVisibility("/users", ["manager"], getCurrentRole);
+    setSidebarLinkVisibility("/users", ["manager", "hr"], getCurrentRole);
     setSidebarLinkVisibility("/archive", ["manager", "supervisor", "hr", "accounting"], getCurrentRole);
 }
 

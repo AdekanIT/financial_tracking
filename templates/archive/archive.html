@@ -254,7 +254,10 @@
         }
 
         .summary-card {
-            padding: 16px;
+            padding: 12px 14px;
+            width: 180px;
+            min-width: 180px;
+            max-width: 180px;
         }
 
         .notes-card {
@@ -378,13 +381,14 @@
 
         .summary-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(170px, 1fr));
+            grid-template-columns: 180px;
             gap: 14px;
             margin-bottom: 16px;
+            justify-content: start;
         }
 
         .summary-label {
-            margin: 0 0 8px 0;
+            margin: 0 0 6px 0;
             font-size: 12px;
             color: #8ea0b8;
             font-weight: 700;
@@ -392,9 +396,10 @@
 
         .summary-value {
             margin: 0;
-            font-size: 24px;
+            font-size: 22px;
             color: #f8fbff;
             font-weight: 800;
+            line-height: 1.1;
         }
 
         .table-card {
@@ -559,12 +564,6 @@
             box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.08) !important;
         }
 
-        @media (max-width: 1400px) {
-            .summary-grid {
-                grid-template-columns: repeat(2, minmax(170px, 1fr));
-            }
-        }
-
         @media (max-width: 1100px) {
             .archive-page-top {
                 flex-direction: column;
@@ -582,11 +581,15 @@
             .toolbar-buttons {
                 align-items: stretch;
             }
-        }
 
-        @media (max-width: 700px) {
             .summary-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .summary-card {
+                width: 100%;
+                max-width: 200px;
+                min-width: 0;
             }
         }
     </style>
@@ -767,21 +770,6 @@
             <p class="summary-label">Total Results</p>
             <h3 class="summary-value" id="summaryTotalResults">0</h3>
         </div>
-
-        <div class="summary-card">
-            <p class="summary-label">Total Broker Price</p>
-            <h3 class="summary-value" id="summaryTotalBrokerPrice">$0</h3>
-        </div>
-
-        <div class="summary-card">
-            <p class="summary-label">Total Driver Pay</p>
-            <h3 class="summary-value" id="summaryTotalDriverPay">$0</h3>
-        </div>
-
-        <div class="summary-card">
-            <p class="summary-label">Total Profit</p>
-            <h3 class="summary-value" id="summaryTotalProfit">$0</h3>
-        </div>
     </section>
 
     <div class="table-card">
@@ -851,6 +839,6 @@
     </div>
 </main>
 
-<script src="/static/js/archive.js?v=17"></script>
+<script src="/static/js/archive.js?v=18"></script>
 </body>
 </html>
