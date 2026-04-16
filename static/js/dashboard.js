@@ -125,6 +125,14 @@ function getCurrentRole() {
     return String(user?.job_title || "").toLowerCase();
 }
 
+function isDispatcherRole() {
+    return getCurrentRole() === "dispatcher";
+}
+
+function isCompanyWideRole() {
+    return ["manager", "accounting", "supervisor"].includes(getCurrentRole());
+}
+
 function setSidebarLinkVisibility(href, allowedRoles, getRoleFn) {
     const role = getRoleFn();
 
@@ -159,15 +167,13 @@ function setDashboardLabels() {
     if (thLabelEl) thLabelEl.textContent = "Staff";
 }
 
-function baseScalesConfig(isStacked = false) {
+function baseScalesConfig() {
     return {
         x: {
-            stacked: isStacked,
             ticks: { color: CHART_COLORS.text },
             grid: { color: CHART_COLORS.gridLine }
         },
         y: {
-            stacked: isStacked,
             beginAtZero: true,
             ticks: { color: CHART_COLORS.text },
             grid: { color: CHART_COLORS.gridLine }
@@ -207,10 +213,6 @@ function getPeriodsArray() {
     return Array.isArray(dashboardPayload.months) ? dashboardPayload.months : [];
 }
 
-/* =========================
-   FIXED PERIOD SELECTION
-========================= */
-
 function toLocalDate(dateValue) {
     const d = new Date(dateValue);
     if (Number.isNaN(d.getTime())) return null;
@@ -225,7 +227,7 @@ function getTodayLocal() {
 function getStartOfWeek(dateValue) {
     const d = new Date(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate());
     const day = d.getDay();
-    const diff = day === 0 ? -6 : 1 - day; // Monday start
+    const diff = day === 0 ? -6 : 1 - day;
     d.setDate(d.getDate() + diff);
     return d;
 }
@@ -255,22 +257,6 @@ function isDateInRange(dateValue, startDate, endDate) {
 }
 
 function getBlockStartDate(block) {
-    const candidates = [
-        block?.period_start,
-        block?.start_date,
-        block?.from_date,
-        block?.date,
-        block?.day_date,
-        block?.week_start,
-        block?.month_start
-    ];
-
-    for (const value of candidates) {
-        const parsed = toLocalDate(value);
-        if (parsed) return parsed;
-    }
-
-    // fallback from label formats like 2026-04-14 or 2026-04
     const label = String(block?.period_label || "").trim();
 
     if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
@@ -281,29 +267,26 @@ function getBlockStartDate(block) {
         return toLocalDate(`${label}-01`);
     }
 
+    if (/^\d{4}-\d{2}-\d{2}\s+to\s+\d{4}-\d{2}-\d{2}$/.test(label)) {
+        const start = label.split(" to ")[0];
+        return toLocalDate(start);
+    }
+
     return null;
 }
 
 function getBlockEndDate(block) {
-    const candidates = [
-        block?.period_end,
-        block?.end_date,
-        block?.to_date,
-        block?.week_end,
-        block?.month_end
-    ];
+    const label = String(block?.period_label || "").trim();
 
-    for (const value of candidates) {
-        const parsed = toLocalDate(value);
-        if (parsed) return parsed;
+    if (/^\d{4}-\d{2}-\d{2}\s+to\s+\d{4}-\d{2}-\d{2}$/.test(label)) {
+        const end = label.split(" to ")[1];
+        return toLocalDate(end);
     }
 
     const start = getBlockStartDate(block);
     if (!start) return null;
 
-    if (currentPeriodType === "day") {
-        return new Date(start);
-    }
+    if (currentPeriodType === "day") return new Date(start);
 
     if (currentPeriodType === "week") {
         const end = new Date(start);
@@ -311,9 +294,7 @@ function getBlockEndDate(block) {
         return end;
     }
 
-    // month fallback
-    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
-    return end;
+    return new Date(start.getFullYear(), start.getMonth() + 1, 0);
 }
 
 function getCurrentPeriodBlock() {
@@ -322,7 +303,6 @@ function getCurrentPeriodBlock() {
 
     const today = getTodayLocal();
 
-    // 1. exact current period match
     if (currentPeriodType === "day") {
         const exact = periods.find(block => {
             const start = getBlockStartDate(block);
@@ -332,15 +312,11 @@ function getCurrentPeriodBlock() {
     }
 
     if (currentPeriodType === "week") {
-        const weekStart = getStartOfWeek(today);
-        const weekEnd = getEndOfWeek(today);
-
         const exact = periods.find(block => {
             const start = getBlockStartDate(block);
             const end = getBlockEndDate(block);
             if (!start || !end) return false;
-            return isDateInRange(today, start, end) ||
-                (isSameDay(start, weekStart) && isSameDay(end, weekEnd));
+            return isDateInRange(today, start, end);
         });
         if (exact) return exact;
     }
@@ -353,7 +329,6 @@ function getCurrentPeriodBlock() {
         if (exact) return exact;
     }
 
-    // 2. nearest past/current block, not future
     const enriched = periods.map(block => {
         const start = getBlockStartDate(block);
         const end = getBlockEndDate(block) || start;
@@ -367,152 +342,96 @@ function getCurrentPeriodBlock() {
         return nonFuture[nonFuture.length - 1].block;
     }
 
-    // 3. fallback first available
     return periods[0];
 }
 
-function getLatestPeriodBlock() {
-    return getCurrentPeriodBlock();
+function normalizeTimeBreakdown(periodBlock) {
+    if (!periodBlock || !Array.isArray(periodBlock.breakdown)) return [];
+
+    return periodBlock.breakdown.map(item => ({
+        label: item.label || "Unknown",
+        shipments: Number(item.shipments || 0),
+        profit: Number(item.profit || 0),
+        gross: Number(item.gross || 0)
+    }));
 }
 
-/* =========================
-   FIXED BREAKDOWN NORMALIZE
-========================= */
+function normalizeDispatcherStats(periodBlock) {
+    if (!periodBlock || !Array.isArray(periodBlock.dispatcher_stats)) return [];
 
-function normalizeContributionBreakdown(periodBlock) {
-    if (!periodBlock) return [];
+    const totalProfit = periodBlock.dispatcher_stats.reduce(
+        (sum, item) => sum + Number(item.profit || 0),
+        0
+    );
 
-    let rows = [];
+    return periodBlock.dispatcher_stats.map(item => ({
+        label: item.staff_full_name || "Unknown",
+        shipments: Number(item.shipments || 0),
+        profit: Number(item.profit || 0),
+        gross: Number(item.gross || 0),
+        share_percent: totalProfit > 0 ? (Number(item.profit || 0) / totalProfit) * 100 : 0
+    }));
+}
 
-    if (Array.isArray(periodBlock.contribution_breakdown) && periodBlock.contribution_breakdown.length > 0) {
-        rows = periodBlock.contribution_breakdown.map(item => ({
-            staff_id: item.staff_id ?? null,
-            label: item.label || item.staff_full_name || "Unknown",
-            shipments: Number(item.shipments || 0),
-            profit: Number(item.profit || 0),
-            gross: Number(item.gross || 0),
-            share_percent: Number(item.share_percent || 0)
-        }));
-    } else if (Array.isArray(periodBlock.breakdown) && periodBlock.breakdown.length > 0) {
-        const total = periodBlock.breakdown.reduce((sum, item) => sum + Number(item.profit || 0), 0);
+function getSelectedTableRows() {
+    const currentBlock = getCurrentPeriodBlock();
+    if (!currentBlock) return [];
 
-        rows = periodBlock.breakdown.map(item => ({
-            staff_id: item.staff_id ?? null,
-            label: item.label || item.staff_full_name || "Unknown",
-            shipments: Number(item.shipments || 0),
-            profit: Number(item.profit || 0),
-            gross: Number(item.gross || 0),
-            share_percent: total > 0 ? (Number(item.profit || 0) / total) * 100 : 0
+    if (isDispatcherRole()) {
+        const rows = normalizeTimeBreakdown(currentBlock);
+        const totalProfit = rows.reduce((sum, item) => sum + Number(item.profit || 0), 0);
+
+        return rows.map(item => ({
+            ...item,
+            share_percent: totalProfit > 0 ? (Number(item.profit || 0) / totalProfit) * 100 : 0
         }));
     }
 
-    return rows;
-}
-
-function getAllKnownStaffRows() {
-    const periods = [
-        ...(Array.isArray(dashboardPayload?.days) ? dashboardPayload.days : []),
-        ...(Array.isArray(dashboardPayload?.weeks) ? dashboardPayload.weeks : []),
-        ...(Array.isArray(dashboardPayload?.months) ? dashboardPayload.months : [])
-    ];
-
-    const staffMap = new Map();
-
-    periods.forEach(period => {
-        const breakdown = normalizeContributionBreakdown(period);
-        breakdown.forEach(item => {
-            const key = item.staff_id ?? item.label;
-            if (!staffMap.has(key)) {
-                staffMap.set(key, {
-                    staff_id: item.staff_id ?? null,
-                    label: item.label || "Unknown",
-                    shipments: 0,
-                    profit: 0,
-                    gross: 0,
-                    share_percent: 0
-                });
-            }
-        });
+    return normalizeDispatcherStats(currentBlock).sort((a, b) => {
+        if (b.profit !== a.profit) return b.profit - a.profit;
+        if (b.shipments !== a.shipments) return b.shipments - a.shipments;
+        return String(a.label).localeCompare(String(b.label));
     });
-
-    return Array.from(staffMap.values());
-}
-
-function buildFullBreakdownForSelectedPeriod() {
-    const currentBlock = getCurrentPeriodBlock();
-    const selectedRows = normalizeContributionBreakdown(currentBlock);
-    const allStaff = getAllKnownStaffRows();
-
-    const selectedMap = new Map();
-    selectedRows.forEach(item => {
-        selectedMap.set(item.staff_id ?? item.label, item);
-    });
-
-    const merged = allStaff.map(staff => {
-        const key = staff.staff_id ?? staff.label;
-        const current = selectedMap.get(key);
-
-        if (current) {
-            return {
-                staff_id: current.staff_id,
-                label: current.label,
-                shipments: Number(current.shipments || 0),
-                profit: Number(current.profit || 0),
-                gross: Number(current.gross || 0),
-                share_percent: Number(current.share_percent || 0)
-            };
-        }
-
-        return {
-            staff_id: staff.staff_id,
-            label: staff.label,
-            shipments: 0,
-            profit: 0,
-            gross: 0,
-            share_percent: 0
-        };
-    });
-
-    const totalProfit = merged.reduce((sum, item) => sum + Number(item.profit || 0), 0);
-
-    return merged
-        .map(item => ({
-            ...item,
-            share_percent: totalProfit > 0 ? (Number(item.profit || 0) / totalProfit) * 100 : 0
-        }))
-        .sort((a, b) => {
-            if (b.profit !== a.profit) return b.profit - a.profit;
-            if (b.shipments !== a.shipments) return b.shipments - a.shipments;
-            return String(a.label).localeCompare(String(b.label));
-        });
 }
 
 function getStableColorForIndex(index) {
     return STAFF_COLOR_PALETTE[index % STAFF_COLOR_PALETTE.length];
 }
 
-function getStaffColorMapFromPeriods(periods) {
-    const uniqueLabels = [];
+function getCurrentColorMap() {
+    const periods = getPeriodsArray();
+    const labels = [];
 
     periods.forEach(period => {
-        const breakdown = normalizeContributionBreakdown(period);
-        breakdown.forEach(item => {
-            if (!uniqueLabels.includes(item.label)) {
-                uniqueLabels.push(item.label);
+        const rows = isDispatcherRole()
+            ? normalizeTimeBreakdown(period)
+            : normalizeDispatcherStats(period);
+
+        rows.forEach(item => {
+            if (!labels.includes(item.label)) {
+                labels.push(item.label);
             }
         });
     });
 
-    const colorMap = {};
-    uniqueLabels.forEach((label, index) => {
-        colorMap[label] = getStableColorForIndex(index);
+    const map = {};
+    labels.forEach((label, index) => {
+        map[label] = getStableColorForIndex(index);
     });
 
-    return colorMap;
+    return map;
 }
 
-function getCurrentColorMap() {
-    return getStaffColorMapFromPeriods(getPeriodsArray());
+function getPeriodTotals(periodBlock) {
+    if (!periodBlock) {
+        return { profit: 0, shipments: 0, gross: 0 };
+    }
+
+    return {
+        profit: Number(periodBlock.profit || 0),
+        shipments: Number(periodBlock.shipments || 0),
+        gross: Number(periodBlock.gross || 0)
+    };
 }
 
 function updateSummaryCards() {
@@ -528,12 +447,14 @@ function updateSummaryCards() {
         return;
     }
 
-    if (totalProfitEl) totalProfitEl.textContent = formatCurrency(latest.profit);
-    if (totalShipmentsEl) totalShipmentsEl.textContent = String(latest.shipments ?? 0);
-    if (totalGrossEl) totalGrossEl.textContent = formatCurrency(latest.gross);
+    const totals = getPeriodTotals(latest);
+
+    if (totalProfitEl) totalProfitEl.textContent = formatCurrency(totals.profit);
+    if (totalShipmentsEl) totalShipmentsEl.textContent = String(totals.shipments ?? 0);
+    if (totalGrossEl) totalGrossEl.textContent = formatCurrency(totals.gross);
     if (topDispatcherEl) topDispatcherEl.textContent = latest.period_label || "Selected Period";
 
-    if (legendTotalProfitEl) legendTotalProfitEl.textContent = formatCurrency(latest.profit);
+    if (legendTotalProfitEl) legendTotalProfitEl.textContent = formatCurrency(totals.profit);
     if (legendTotalPeriodLabelEl) legendTotalPeriodLabelEl.textContent = latest.period_label || "Selected period";
 }
 
@@ -546,11 +467,10 @@ function createTextCell(text) {
 function renderTable() {
     if (!dispatcherTableBody) return;
 
-    const breakdown = buildFullBreakdownForSelectedPeriod();
-
+    const rows = getSelectedTableRows();
     dispatcherTableBody.innerHTML = "";
 
-    if (!breakdown.length) {
+    if (!rows.length) {
         const tr = document.createElement("tr");
         const td = document.createElement("td");
         td.colSpan = 5;
@@ -561,8 +481,8 @@ function renderTable() {
         return;
     }
 
-    breakdown.forEach((item, index) => {
-        const share = item.share_percent || 0;
+    rows.forEach((item, index) => {
+        const share = Number(item.share_percent || 0);
         const tr = document.createElement("tr");
         tr.appendChild(createTextCell(index + 1));
         tr.appendChild(createTextCell(item.label || "-"));
@@ -573,32 +493,27 @@ function renderTable() {
     });
 }
 
-function renderLegend() {
+function renderLegendRows(rows, totalProfit) {
     if (!legendListEl) return;
 
-    const breakdown = buildFullBreakdownForSelectedPeriod();
     const colorMap = getCurrentColorMap();
-
     legendListEl.innerHTML = "";
 
-    if (!breakdown.length || currentChartType !== "doughnut") {
+    if (!rows.length) {
         const empty = document.createElement("div");
         empty.className = "legend-empty";
-        empty.textContent =
-            currentChartType === "doughnut"
-                ? "No contribution data found for the selected period."
-                : "Switch to Contribution to see the current selected period split.";
+        empty.textContent = "No contribution data found for the selected period.";
         legendListEl.appendChild(empty);
         return;
     }
 
-    breakdown.forEach((item, index) => {
+    rows.forEach((item, index) => {
         const wrapper = document.createElement("div");
         wrapper.className = "legend-item";
 
         const colorDot = document.createElement("span");
         colorDot.className = "legend-color";
-        colorDot.style.background = colorMap[item.label] || getStableColorForIndex(index);
+        colorDot.style.background = item.color || colorMap[item.label] || getStableColorForIndex(index);
 
         const content = document.createElement("div");
 
@@ -611,17 +526,16 @@ function renderLegend() {
 
         const profit = document.createElement("div");
         profit.className = "legend-profit";
-        profit.textContent = formatCurrency(item.profit || 0);
+        profit.textContent = formatCurrency(item.value || 0);
 
         mainRow.appendChild(name);
         mainRow.appendChild(profit);
 
         const sub = document.createElement("div");
         sub.className = "legend-sub";
-        sub.innerHTML = `
-            <span>Shipments: ${item.shipments ?? 0}</span>
-            <span>Share: ${(item.share_percent || 0).toFixed(1)}%</span>
-        `;
+
+        const share = totalProfit > 0 ? (Number(item.value || 0) / totalProfit) * 100 : 0;
+        sub.innerHTML = `<span>Share: ${share.toFixed(1)}%</span>`;
 
         content.appendChild(mainRow);
         content.appendChild(sub);
@@ -633,6 +547,23 @@ function renderLegend() {
     });
 }
 
+function renderLegend() {
+    if (!legendListEl) return;
+
+    legendListEl.innerHTML = "";
+
+    if (currentChartType !== "doughnut") {
+        const empty = document.createElement("div");
+        empty.className = "legend-empty";
+        empty.textContent = "Switch to Contribution to see the current selected period split.";
+        legendListEl.appendChild(empty);
+        return;
+    }
+
+    const data = getContributionChartData();
+    renderLegendRows(data.rows, data.totalProfit);
+}
+
 function updateChartTexts() {
     if (!analyticsSubtitleEl || !legendTitleEl || !legendSubtitleEl) return;
 
@@ -640,20 +571,27 @@ function updateChartTexts() {
     const periodLabel = latest?.period_label || "selected period";
 
     if (currentChartType === "doughnut") {
-        analyticsSubtitleEl.textContent =
-            `Contribution shows only the current selected ${currentPeriodType}.`;
-        legendTitleEl.textContent = "Contributions";
-        legendSubtitleEl.textContent = `Current selected period staff contribution · ${periodLabel}`;
+        if (currentPeriodType === "month") {
+            analyticsSubtitleEl.textContent = "Contribution shows weekly split inside the selected month.";
+            legendTitleEl.textContent = "Monthly Split";
+            legendSubtitleEl.textContent = `Selected month split by weeks · ${periodLabel}`;
+        } else if (currentPeriodType === "week") {
+            analyticsSubtitleEl.textContent = "Contribution shows daily split inside the selected week.";
+            legendTitleEl.textContent = "Weekly Split";
+            legendSubtitleEl.textContent = `Selected week split by days · ${periodLabel}`;
+        } else {
+            analyticsSubtitleEl.textContent = "Contribution shows one total circle for the selected day.";
+            legendTitleEl.textContent = "Daily Total";
+            legendSubtitleEl.textContent = `Selected day total · ${periodLabel}`;
+        }
     } else if (currentChartType === "line") {
-        analyticsSubtitleEl.textContent =
-            `Trend shows staff profit movement across visible ${currentPeriodType} periods.`;
+        analyticsSubtitleEl.textContent = `Trend shows one overall profit line across visible ${currentPeriodType} periods.`;
         legendTitleEl.textContent = "Contribution Panel";
-        legendSubtitleEl.textContent = "Switch to Contribution to see the current selected period split";
+        legendSubtitleEl.textContent = "Switch to Contribution to see the selected period split";
     } else {
-        analyticsSubtitleEl.textContent =
-            `Bar compares stacked staff contributions across visible ${currentPeriodType} periods.`;
+        analyticsSubtitleEl.textContent = `Bar shows one total profit bar for each visible ${currentPeriodType} period.`;
         legendTitleEl.textContent = "Contribution Panel";
-        legendSubtitleEl.textContent = "Switch to Contribution to see the current selected period split";
+        legendSubtitleEl.textContent = "Switch to Contribution to see the selected period split";
     }
 }
 
@@ -684,26 +622,115 @@ function renderCenterTextPlugin(textTop, textBottom) {
     };
 }
 
+function getContributionChartData() {
+    const selectedBlock = getCurrentPeriodBlock();
+    const allPeriods = getPeriodsArray();
+
+    if (!selectedBlock) {
+        return { rows: [], totalProfit: 0, centerText: "$0" };
+    }
+
+    if (currentPeriodType === "day") {
+        const totals = getPeriodTotals(selectedBlock);
+        return {
+            rows: [{
+                label: isDispatcherRole() ? "My Profit" : "Total Profit",
+                value: totals.profit,
+                color: getStableColorForIndex(0)
+            }],
+            totalProfit: totals.profit,
+            centerText: formatCurrency(totals.profit)
+        };
+    }
+
+    if (currentPeriodType === "week") {
+        const weekStart = getBlockStartDate(selectedBlock);
+        const weekEnd = getBlockEndDate(selectedBlock);
+
+        const rows = allPeriods
+            .filter(item => {
+                const date = getBlockStartDate(item);
+                return date && weekStart && weekEnd && isDateInRange(date, weekStart, weekEnd);
+            })
+            .sort((a, b) => getBlockStartDate(a) - getBlockStartDate(b))
+            .map((item, index) => {
+                const totals = getPeriodTotals(item);
+                const dt = getBlockStartDate(item);
+                return {
+                    label: dt ? dt.toLocaleDateString(undefined, { weekday: "short" }) : `Day ${index + 1}`,
+                    value: totals.profit,
+                    color: getStableColorForIndex(index)
+                };
+            });
+
+        const totalProfit = rows.reduce((sum, item) => sum + Number(item.value || 0), 0);
+
+        return {
+            rows,
+            totalProfit,
+            centerText: formatCurrency(totalProfit)
+        };
+    }
+
+    const monthStart = getBlockStartDate(selectedBlock);
+    const monthEnd = getBlockEndDate(selectedBlock);
+    const weekMap = new Map();
+
+    allPeriods
+        .filter(item => {
+            const date = getBlockStartDate(item);
+            return date && monthStart && monthEnd && isDateInRange(date, monthStart, monthEnd);
+        })
+        .forEach(item => {
+            const dt = getBlockStartDate(item);
+            if (!dt) return;
+
+            const weekIndex = Math.floor((dt.getDate() - 1) / 7) + 1;
+            const key = `Week ${weekIndex}`;
+            const totals = getPeriodTotals(item);
+
+            if (!weekMap.has(key)) {
+                weekMap.set(key, {
+                    label: key,
+                    value: 0
+                });
+            }
+
+            weekMap.get(key).value += Number(totals.profit || 0);
+        });
+
+    const rows = Array.from(weekMap.values()).map((item, index) => ({
+        ...item,
+        color: getStableColorForIndex(index)
+    }));
+
+    const totalProfit = rows.reduce((sum, item) => sum + Number(item.value || 0), 0);
+
+    return {
+        rows,
+        totalProfit,
+        centerText: formatCurrency(totalProfit)
+    };
+}
+
 function renderDoughnutChart() {
     const canvas = getCanvas();
     if (!canvas) return;
 
-    const latest = getCurrentPeriodBlock();
-    const breakdown = buildFullBreakdownForSelectedPeriod();
-    if (!breakdown.length) return;
+    const contributionData = getContributionChartData();
+    const rows = contributionData.rows || [];
+    if (!rows.length) return;
 
-    const colorMap = getCurrentColorMap();
-
-    const labels = breakdown.map(item => item.label);
-    const values = breakdown.map(item => Number(item.profit || 0));
-    const colors = breakdown.map((item, index) => colorMap[item.label] || getStableColorForIndex(index));
+    const labels = rows.map(item => item.label);
+    const values = rows.map(item => Number(item.value || 0));
+    const colors = rows.map(item => item.color || getStableColorForIndex(0));
 
     profitChartInstance = new Chart(canvas.getContext("2d"), {
         type: "doughnut",
         data: {
             labels,
             datasets: [{
-                label: "Staff contribution",
+                label: "Contribution",
                 data: values,
                 backgroundColor: colors,
                 borderColor: "rgba(11, 17, 24, 0.85)",
@@ -737,7 +764,7 @@ function renderDoughnutChart() {
             }
         },
         plugins: [
-            renderCenterTextPlugin("Current Profit", formatCurrency(latest?.profit || 0))
+            renderCenterTextPlugin("Selected Profit", contributionData.centerText)
         ]
     });
 }
@@ -749,31 +776,24 @@ function renderLineChart() {
     const periods = getPeriodsArray();
     if (!periods.length) return;
 
-    const colorMap = getCurrentColorMap();
-    const allStaff = getAllKnownStaffRows();
-    const staffNames = allStaff.map(item => item.label);
-
-    const datasets = staffNames.map((name, index) => ({
-        label: name,
-        data: periods.map(period => {
-            const breakdown = normalizeContributionBreakdown(period);
-            const matched = breakdown.find(item => item.label === name);
-            return matched ? Number(matched.profit || 0) : 0;
-        }),
-        borderColor: colorMap[name] || getStableColorForIndex(index),
-        backgroundColor: colorMap[name] || getStableColorForIndex(index),
-        fill: false,
-        tension: 0.30,
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        borderWidth: 2
-    }));
+    const labels = periods.map(item => item.period_label);
+    const values = periods.map(item => Number(item.profit || 0));
 
     profitChartInstance = new Chart(canvas.getContext("2d"), {
         type: "line",
         data: {
-            labels: periods.map(item => item.period_label),
-            datasets
+            labels,
+            datasets: [{
+                label: isDispatcherRole() ? "My Profit" : "Total Profit",
+                data: values,
+                borderColor: CHART_COLORS.companyLine,
+                backgroundColor: CHART_COLORS.companyFill,
+                fill: true,
+                tension: 0.30,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                borderWidth: 3
+            }]
         },
         options: {
             responsive: true,
@@ -790,51 +810,45 @@ function renderLineChart() {
                     borderColor: "rgba(96, 165, 250, 0.18)",
                     borderWidth: 1,
                     titleColor: "#f8fbff",
-                    bodyColor: "#dce7f5"
+                    bodyColor: "#dce7f5",
+                    callbacks: {
+                        label(context) {
+                            return `${context.dataset.label}: ${formatCurrency(context.raw)}`;
+                        }
+                    }
                 }
             },
-            scales: baseScalesConfig(false)
+            scales: baseScalesConfig()
         }
     });
 }
 
-function renderStackedBarChart() {
+function renderBarChart() {
     const canvas = getCanvas();
     if (!canvas) return;
 
     const periods = getPeriodsArray();
     if (!periods.length) return;
 
-    const colorMap = getCurrentColorMap();
-    const allStaff = getAllKnownStaffRows();
-    const staffNames = allStaff.map(item => item.label);
-
-    const datasets = staffNames.map((name, index) => ({
-        label: name,
-        data: periods.map(period => {
-            const breakdown = normalizeContributionBreakdown(period);
-            const matched = breakdown.find(item => item.label === name);
-            return matched ? Number(matched.profit || 0) : 0;
-        }),
-        backgroundColor: colorMap[name] || getStableColorForIndex(index),
-        borderRadius: 8,
-        maxBarThickness: 48
-    }));
+    const labels = periods.map(item => item.period_label);
+    const values = periods.map(item => Number(item.profit || 0));
 
     profitChartInstance = new Chart(canvas.getContext("2d"), {
         type: "bar",
         data: {
-            labels: periods.map(item => item.period_label),
-            datasets
+            labels,
+            datasets: [{
+                label: isDispatcherRole() ? "My Profit" : "Total Profit",
+                data: values,
+                backgroundColor: "rgba(59, 130, 246, 0.90)",
+                borderRadius: 8,
+                maxBarThickness: 56
+            }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             animation: BASE_ANIMATION,
-            interaction: {
-                mode: "index",
-                intersect: false
-            },
             plugins: {
                 legend: baseLegendConfig(true),
                 tooltip: {
@@ -842,10 +856,15 @@ function renderStackedBarChart() {
                     borderColor: "rgba(96, 165, 250, 0.18)",
                     borderWidth: 1,
                     titleColor: "#f8fbff",
-                    bodyColor: "#dce7f5"
+                    bodyColor: "#dce7f5",
+                    callbacks: {
+                        label(context) {
+                            return `${context.dataset.label}: ${formatCurrency(context.raw)}`;
+                        }
+                    }
                 }
             },
-            scales: baseScalesConfig(true)
+            scales: baseScalesConfig()
         }
     });
 }
@@ -853,7 +872,7 @@ function renderStackedBarChart() {
 const CHART_RENDERERS = {
     doughnut: renderDoughnutChart,
     line: renderLineChart,
-    bar: renderStackedBarChart
+    bar: renderBarChart
 };
 
 function renderCurrentChart() {
@@ -969,6 +988,8 @@ async function loadDashboardData() {
         }
 
         const rawPayload = await response.json();
+        console.log("dashboard payload:", rawPayload);
+
         dashboardPayload = normalizeDashboardPayload(rawPayload);
 
         updateSummaryCards();
